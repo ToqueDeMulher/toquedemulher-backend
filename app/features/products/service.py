@@ -9,7 +9,7 @@ import httpx
 from fastapi import HTTPException, UploadFile
 from sqlmodel import Session, select
 
-from ignore import Ignore
+from app.core.settings import settings
 from app.features.products.models import Product
 
 
@@ -26,11 +26,11 @@ class SupabaseSettings:
 
 
 def get_supabase_settings() -> SupabaseSettings:
-    url = Ignore.SUPABASE_URL
-    key = Ignore.SUPABASE_SERVICE_ROLE_KEY
-    bucket = Ignore.SUPABASE_BUCKET
-    folder = Ignore.SUPABASE_FOLDER
-    timeout = float(Ignore.SUPABASE_TIMEOUT)
+    url = settings.SUPABASE_URL
+    key = settings.SUPABASE_SERVICE_ROLE_KEY
+    bucket = settings.SUPABASE_BUCKET
+    folder = settings.SUPABASE_FOLDER
+    timeout = settings.SUPABASE_TIMEOUT
 
     if not url or not key:
         raise HTTPException(

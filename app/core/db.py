@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 from datetime import datetime, date
 
 from sqlmodel import SQLModel, Field, Relationship, create_engine
-from ignore import Ignore  # sua string de conexao
+from app.core.settings import settings
 
 if TYPE_CHECKING:
     from app.features.products.models import Product, ProductReview, ProductImage
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 # ENGINE
 # ======================================================
 
-engine = create_engine(Ignore.DATABASE_URL, echo=True)
+engine = create_engine(settings.DATABASE_URL, echo=settings.SQL_ECHO)
 
 
 # ======================================================
