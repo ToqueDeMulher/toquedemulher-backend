@@ -1,13 +1,13 @@
 from typing import List, Optional
 from datetime import date
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class ProductPayload(BaseModel):
     name: str
-    price: float
-    active: bool
+    price: float = Field(ge=0)
+    active: bool = True
     volume: Optional[str] = None
     target_audience: Optional[str] = None
     product_type: Optional[str] = None
@@ -24,7 +24,7 @@ class ProductPayload(BaseModel):
 class SupplierPayload(BaseModel):
     name: str
     contact: Optional[str] = None
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
 
 
 class BrandPayload(BaseModel):
@@ -42,21 +42,21 @@ class CategoryPayload(BaseModel):
 
 
 class StockPayload(BaseModel):
-    quantity: int
+    quantity: int = Field(ge=0)
     # string tipo "YYYY-MM-DD" ou null -> Pydantic converte pra date
     expiry_date: Optional[date] = None
 
 
 class ProductImagePayload(BaseModel):
     url: str
-    order: int
+    order: int = Field(ge=1)
     alt_text: Optional[str] = None
 
 
 class ProductImageResponse(BaseModel):
     id: int
     url: str
-    order: int
+    order: int = Field(ge=1)
     alt_text: Optional[str] = None
 
 

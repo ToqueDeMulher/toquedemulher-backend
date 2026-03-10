@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     SUPABASE_BUCKET: str = "product-images"
     SUPABASE_FOLDER: str = "products"
     SUPABASE_TIMEOUT: float = 20.0
+    PRODUCT_IMAGE_MAX_BYTES: int = 5 * 1024 * 1024
 
 
 settings = Settings()

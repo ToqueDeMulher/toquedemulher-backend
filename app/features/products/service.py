@@ -14,6 +14,7 @@ from app.features.products.models import Product
 
 
 SLUG_INVALID_CHARS = re.compile(r"[^a-z0-9-]+")
+UPLOAD_CHUNK_SIZE = 1024 * 1024
 
 
 @dataclass
@@ -23,6 +24,7 @@ class SupabaseSettings:
     bucket: str
     folder: str
     timeout: float
+    max_upload_bytes: int
 
 
 def get_supabase_settings() -> SupabaseSettings:
@@ -31,6 +33,7 @@ def get_supabase_settings() -> SupabaseSettings:
     bucket = settings.SUPABASE_BUCKET
     folder = settings.SUPABASE_FOLDER
     timeout = settings.SUPABASE_TIMEOUT
+    max_upload_bytes = settings.PRODUCT_IMAGE_MAX_BYTES
 
     if not url or not key:
         raise HTTPException(
@@ -38,26 +41,32 @@ def get_supabase_settings() -> SupabaseSettings:
             detail="Supabase nao configurado. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.",
         )
 
-    return SupabaseSettings(url=url, key=key, bucket=bucket, folder=folder, timeout=timeout)
+    return SupabaseSettings(
+        url=url,
+        key=key,
+        bucket=bucket,
+        folder=folder,
+        timeout=timeout,
+        max_upload_bytes=max_upload_bytes,
+    )
 
 
 async def upload_to_supabase(*, product_id: UUID, file: UploadFile, extension: str) -> str:
-    settings = get_supabase_settings()
+    supabase_settings = get_supabase_settings()
 
-    file_key = f"{settings.folder}/{product_id}/{uuid4().hex}{extension}"
-    upload_url = f"{settings.url}/storage/v1/object/{settings.bucket}/{file_key}"
+    file_key = f"{supabase_settings.folder}/{product_id}/{uuid4().hex}{extension}"
+    upload_url = f"{supabase_settings.url}/storage/v1/object/{supabase_settings.bucket}/{file_key}"
 
-    await file.seek(0)
-    file_bytes = await file.read()
+    file_bytes = await read_upload_bytes(file=file, max_bytes=supabase_settings.max_upload_bytes)
 
     headers = {
-        "Authorization": f"Bearer {settings.key}",
-        "apikey": settings.key,
+        "Authorization": f"Bearer {supabase_settings.key}",
+        "apikey": supabase_settings.key,
         "Content-Type": file.content_type or "application/octet-stream",
         "x-upsert": "true",
     }
 
-    async with httpx.AsyncClient(timeout=settings.timeout) as client:
+    async with httpx.AsyncClient(timeout=supabase_settings.timeout) as client:
         response = await client.post(upload_url, headers=headers, content=file_bytes)
 
     if response.status_code >= 400:
@@ -66,7 +75,30 @@ async def upload_to_supabase(*, product_id: UUID, file: UploadFile, extension: s
             detail=f"Supabase retornou erro {response.status_code}: {response.text}",
         )
 
-    return f"{settings.url}/storage/v1/object/public/{settings.bucket}/{file_key}"
+    return f"{supabase_settings.url}/storage/v1/object/public/{supabase_settings.bucket}/{file_key}"
+
+
+async def read_upload_bytes(*, file: UploadFile, max_bytes: int) -> bytes:
+    await file.seek(0)
+
+    total_size = 0
+    chunks: list[bytes] = []
+
+    while True:
+        chunk = await file.read(UPLOAD_CHUNK_SIZE)
+        if not chunk:
+            break
+
+        total_size += len(chunk)
+        if total_size > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Arquivo excede o limite de {max_bytes} bytes.",
+            )
+
+        chunks.append(chunk)
+
+    return b"".join(chunks)
 
 
 def slugify(value: str) -> str:

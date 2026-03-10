@@ -156,11 +156,21 @@ def create_product(
     except HTTPException:
         raise
     except Exception as e:
+        session.rollback()
         print("Erro ao criar produto:", repr(e))
         raise HTTPException(status_code=500, detail=f"Erro interno: {e}")
 
 
-@router.post("/{product_id}/images/upload", response_model=ProductImageResponse)
+@router.post(
+    "/{product_id}/images/upload",
+    response_model=ProductImageResponse,
+    responses={
+        400: {"description": "Formato de imagem inválido."},
+        404: {"description": "Produto não encontrado."},
+        413: {"description": "Arquivo maior que o limite configurado."},
+        500: {"description": "Falha ao persistir a imagem."},
+    },
+)
 async def upload_product_image(
     product_id: UUID,
     file: UploadFile = File(...),
@@ -200,9 +210,13 @@ async def upload_product_image(
         alt_text=alt_text,
     )
 
-    session.add(image)
-    session.commit()
-    session.refresh(image)
+    try:
+        session.add(image)
+        session.commit()
+        session.refresh(image)
+    except Exception as exc:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro interno: {exc}") from exc
 
     return ProductImageResponse(
         id=image.id,

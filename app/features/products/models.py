@@ -2,9 +2,11 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime, date
 
+from sqlalchemy import CheckConstraint
 from sqlmodel import SQLModel, Field, Relationship
 
 from app.core.db import UserInDB
+from app.core.time import utc_now
 
 
 # ======================================================
@@ -24,7 +26,7 @@ class Category(SQLModel, table=True):
     __tablename__ = "category"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
+    name: str = Field(index=True)
 
     products: List["Product"] = Relationship(
         back_populates="categories",
@@ -36,9 +38,9 @@ class Supplier(SQLModel, table=True):
     __tablename__ = "supplier"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
+    name: str = Field(index=True)
     contact: Optional[str] = None
-    email: Optional[str] = None
+    email: Optional[str] = Field(default=None, index=True)
 
     products: List["Product"] = Relationship(back_populates="supplier")
 
@@ -47,7 +49,7 @@ class Brand(SQLModel, table=True):
     __tablename__ = "brand"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
+    name: str = Field(index=True)
 
     products: List["Product"] = Relationship(back_populates="brand")
 
@@ -65,13 +67,16 @@ class Description(SQLModel, table=True):
 
 class Stock(SQLModel, table=True):
     __tablename__ = "stock"
+    __table_args__ = (
+        CheckConstraint("quantity >= 0", name="ck_stock_quantity_non_negative"),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    product_id: UUID = Field(foreign_key="product.id")
+    product_id: UUID = Field(foreign_key="product.id", index=True)
 
     quantity: int
     expiry_date: Optional[date] = None
-    last_update: datetime = Field(default_factory=datetime.utcnow)
+    last_update: datetime = Field(default_factory=utc_now)
     last_quantity: Optional[int] = None
 
     product: Optional["Product"] = Relationship(back_populates="stock_items")
@@ -79,6 +84,9 @@ class Stock(SQLModel, table=True):
 
 class Product(SQLModel, table=True):
     __tablename__ = "product"
+    __table_args__ = (
+        CheckConstraint("price >= 0", name="ck_product_price_non_negative"),
+    )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     slug: str = Field(index=True, unique=True)
@@ -98,12 +106,12 @@ class Product(SQLModel, table=True):
     cruelty_free: bool = Field(default=False)
     hypoallergenic: bool = Field(default=False)
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
-    supplier_id: Optional[int] = Field(default=None, foreign_key="supplier.id")
-    brand_id: Optional[int] = Field(default=None, foreign_key="brand.id")
-    description_id: Optional[int] = Field(default=None, foreign_key="description.id")
+    supplier_id: Optional[int] = Field(default=None, foreign_key="supplier.id", index=True)
+    brand_id: Optional[int] = Field(default=None, foreign_key="brand.id", index=True)
+    description_id: Optional[int] = Field(default=None, foreign_key="description.id", index=True)
 
     supplier: Optional[Supplier] = Relationship(back_populates="products")
     brand: Optional[Brand] = Relationship(back_populates="products")
@@ -122,15 +130,18 @@ class Product(SQLModel, table=True):
 
 class ProductReview(SQLModel, table=True):
     __tablename__ = "product_review"
+    __table_args__ = (
+        CheckConstraint("rating >= 1 AND rating <= 5", name="ck_product_review_rating_range"),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    product_id: UUID = Field(foreign_key="product.id")
-    user_id: UUID = Field(foreign_key="userindb.id")
+    product_id: UUID = Field(foreign_key="product.id", index=True)
+    user_id: UUID = Field(foreign_key="userindb.id", index=True)
 
     rating: int
     title: Optional[str] = None
     comment: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
 
     product: Optional[Product] = Relationship(back_populates="reviews")
     user: Optional[UserInDB] = Relationship(back_populates="reviews")
@@ -138,9 +149,12 @@ class ProductReview(SQLModel, table=True):
 
 class ProductImage(SQLModel, table=True):
     __tablename__ = "product_image"
+    __table_args__ = (
+        CheckConstraint('"order" >= 1', name="ck_product_image_order_positive"),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    product_id: UUID = Field(foreign_key="product.id")
+    product_id: UUID = Field(foreign_key="product.id", index=True)
 
     url: str
     order: int = Field(default=1)
