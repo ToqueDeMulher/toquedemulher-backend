@@ -16,17 +16,7 @@ from app.core.db import (
     Payment,
     Coupon,
 )
-from app.features.products.models import (
-    CategoryProductLink,
-    Category,
-    Supplier,
-    Brand,
-    Description,
-    Stock,
-    Product,
-    ProductReview,
-    ProductImage,
-)
+
 
 __all__ = [
     "engine",

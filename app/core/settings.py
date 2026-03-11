@@ -1,8 +1,21 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# 1. Encontra a pasta raiz do projeto de forma absoluta
+# __file__ é este arquivo (settings.py). Vamos subindo as pastas:
+# .parent (core) -> .parent (app) -> .parent (Projeto Integrador)
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+
+# 2. Junta o caminho da raiz com o nome do arquivo .env
+ENV_FILE_PATH = ROOT_DIR / ".env"
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    # 3. Passamos o caminho absoluto (ENV_FILE_PATH) para o Pydantic
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_FILE_PATH), 
+        env_file_encoding="utf-8",
+        extra="ignore"  # Ignora variáveis extras no .env que não estejam listadas aqui
+    )
 
     DATABASE_URL: str
     SQL_ECHO: bool = False

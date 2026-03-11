@@ -1,21 +1,18 @@
 from __future__ import annotations
-
 from typing import List, Optional
 from uuid import UUID
-
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlmodel import Session, select
-
 from app.core.db import get_session
-from app.features.products.models import (
-    Product,
-    Supplier,
-    Brand,
-    Description,
-    Category,
-    Stock,
-    ProductImage,
-)
+from app.models.stock import Stock
+from app.models.category import Category
+from app.models.product import Product
+from app.models.supplier import Supplier
+from app.models.brand import Brand
+from app.models.description import Description
+from app.models.productImage import ProductImage
+
+
 from app.features.products.schemas import (
     CreateProductPayload,
     ProductImageResponse,

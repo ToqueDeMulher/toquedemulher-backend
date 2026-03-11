@@ -8,7 +8,9 @@ from app.core.settings import settings
 from app.core.time import utc_now
 
 if TYPE_CHECKING:
-    from app.features.products.models import Product, ProductReview, ProductImage
+    from app.models.product import Product
+    from app.models.productImage import ProductImage
+    from app.models.productReview import ProductReview
 
 
 # ======================================================
@@ -234,8 +236,7 @@ class Coupon(SQLModel, table=True):
 def create_db_and_tables():
     print("Criando tabelas no banco...")
 
-    from app.features.products import models as _product_models  # noqa: F401
-
+    
     SQLModel.metadata.create_all(engine)
     print("Tabelas criadas com sucesso!")
 

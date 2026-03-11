@@ -10,7 +10,7 @@ from fastapi import HTTPException, UploadFile
 from sqlmodel import Session, select
 
 from app.core.settings import settings
-from app.features.products.models import Product
+from app.models.product import Product
 
 
 SLUG_INVALID_CHARS = re.compile(r"[^a-z0-9-]+")
