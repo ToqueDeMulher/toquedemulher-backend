@@ -27,6 +27,12 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173"
     )
 
+    MERCADO_PAGO_ACCESS_TOKEN: str
+    MERCADO_PAGO_PUBLIC_KEY: str
+    MERCADO_PAGO_WEBHOOK_URL: str
+    FRONTEND_SUCCESS_URL: str
+    FRONTEND_PENDING_URL: str
+    FRONTEND_FAILURE_URL: str
     SUPABASE_URL: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_BUCKET: str = "product-images"
