@@ -11,12 +11,8 @@ from app.models.supplier import Supplier
 from app.models.brand import Brand
 from app.models.description import Description
 from app.models.productImage import ProductImage
-
-
-from app.features.products.schemas import (
-    CreateProductPayload,
-    ProductImageResponse,
-)
+from app.schemas.create_products import (CreateProductRequest,CreateProductResponse,)
+from app.schemas.product_images import ProductImageResponse
 from app.features.products.service import generate_unique_slug, upload_to_supabase
 
 
@@ -32,13 +28,13 @@ ALLOWED_IMAGE_TYPES = {
 }
 
 
-@router.post("")
+@router.post("", response_model=CreateProductResponse)
 def create_product(
-    payload: CreateProductPayload,
+    payload: CreateProductRequest,
     session: Session = Depends(get_session),
 ):
     try:
-        # 1) SUPPLIER (pega ou cria)
+        # 1) SUPPLIER (busca ou cria)
         supplier = session.exec(
             select(Supplier).where(Supplier.name == payload.supplier.name)
         ).first()
@@ -50,17 +46,19 @@ def create_product(
                 email=payload.supplier.email,
             )
             session.add(supplier)
-            session.flush()  # gera supplier.id
+            session.flush()
 
-        # 2) BRAND (pega ou cria)
-        brand = session.exec(select(Brand).where(Brand.name == payload.brand.name)).first()
+        # 2) BRAND (busca ou cria)
+        brand = session.exec(
+            select(Brand).where(Brand.name == payload.brand.name)
+        ).first()
 
         if not brand:
             brand = Brand(name=payload.brand.name)
             session.add(brand)
-            session.flush()  # gera brand.id
+            session.flush()
 
-        # 3) DESCRIPTION (pega ou cria)
+        # 3) DESCRIPTION (busca ou cria)
         description = session.exec(
             select(Description).where(Description.text == payload.description.text)
         ).first()
@@ -72,90 +70,97 @@ def create_product(
                 ingredients=payload.description.ingredients,
             )
             session.add(description)
-            session.flush()  # gera description.id
+            session.flush()
 
-        # 4) CATEGORIES (pega ou cria)
+        # 4) CATEGORIES (busca ou cria)
         category_objs: List[Category] = []
-        for cat_data in payload.categories:
-            cat = session.exec(select(Category).where(Category.name == cat_data.name)).first()
-            if not cat:
-                cat = Category(name=cat_data.name)
-                session.add(cat)
+
+        for category_data in payload.categories:
+            category = session.exec(
+                select(Category).where(Category.name == category_data.name)
+            ).first()
+
+            if not category:
+                category = Category(name=category_data.name)
+                session.add(category)
                 session.flush()
-            category_objs.append(cat)
+
+            category_objs.append(category)
 
         # 5) PRODUCT
-        p = payload.product
-        slug = generate_unique_slug(session, p.name)
+        product_data = payload.product
+        slug = generate_unique_slug(session, product_data.name)
 
         product = Product(
             slug=slug,
-            name=p.name,
-            price=p.price,
-            active=p.active,
-            volume=p.volume,
-            target_audience=p.target_audience,
-            product_type=p.product_type,
-            skin_type=p.skin_type,
-            hair_type=p.hair_type,
-            color=p.color,
-            fragrance=p.fragrance,
-            spf=p.spf,
-            vegan=p.vegan,
-            cruelty_free=p.cruelty_free,
-            hypoallergenic=p.hypoallergenic,
+            name=product_data.name,
+            price=product_data.price,
+            active=product_data.active,
+            volume=product_data.volume,
+            target_audience=product_data.target_audience,
+            product_type=product_data.product_type,
+            skin_type=product_data.skin_type,
+            hair_type=product_data.hair_type,
+            color=product_data.color,
+            fragrance=product_data.fragrance,
+            spf=product_data.spf,
+            vegan=product_data.vegan,
+            cruelty_free=product_data.cruelty_free,
+            hypoallergenic=product_data.hypoallergenic,
             supplier_id=supplier.id,
             brand_id=brand.id,
             description_id=description.id,
         )
         session.add(product)
-        session.flush()  # gera product.id
+        session.flush()
 
-        # vincula categorias pelo relacionamento
-        for cat in category_objs:
-            if cat not in product.categories:
-                product.categories.append(cat)
+        # 6) vincula categorias
+        for category in category_objs:
+            if category not in product.categories:
+                product.categories.append(category)
 
-        # 6) STOCK
-        s = payload.stock
+        # 7) STOCK
+        stock_data = payload.stock
         stock = Stock(
             product_id=product.id,
-            quantity=s.quantity,
-            expiry_date=s.expiry_date,
-            last_quantity=s.quantity,
+            quantity=stock_data.quantity,
+            expiry_date=stock_data.expiry_date,
+            last_quantity=stock_data.quantity,
         )
         session.add(stock)
 
-        # 7) IMAGENS
-        for img in payload.images:
-            session.add(
-                ProductImage(
-                    product_id=product.id,
-                    url=img.url,
-                    order=img.order,
-                    alt_text=img.alt_text,
-                )
+        # 8) IMAGES
+        for image_data in payload.images:
+            image = ProductImage(
+                product_id=product.id,
+                url=image_data.url,
+                order=image_data.order,
+                alt_text=image_data.alt_text,
             )
+            session.add(image)
 
-        # 8) COMMIT
+        # 9) COMMIT
         session.commit()
         session.refresh(product)
 
-        return {
-            "id": product.id,
-            "slug": product.slug,
-            "name": product.name,
-            "supplier_id": supplier.id,
-            "brand_id": brand.id,
-            "description_id": description.id,
-        }
+        return CreateProductResponse(
+            id=product.id,
+            slug=product.slug,
+            name=product.name,
+            supplier_id=supplier.id,
+            brand_id=brand.id,
+            description_id=description.id,
+        )
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as exc:
         session.rollback()
-        print("Erro ao criar produto:", repr(e))
-        raise HTTPException(status_code=500, detail=f"Erro interno: {e}")
+        print("Erro ao criar produto:", repr(exc))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro interno: {exc}",
+        ) from exc
 
 
 @router.post(
@@ -213,7 +218,10 @@ async def upload_product_image(
         session.refresh(image)
     except Exception as exc:
         session.rollback()
-        raise HTTPException(status_code=500, detail=f"Erro interno: {exc}") from exc
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro interno: {exc}",
+        ) from exc
 
     return ProductImageResponse(
         id=image.id,
