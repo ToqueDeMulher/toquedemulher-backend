@@ -3,7 +3,7 @@ from app.schemas.payments import (
     CreatePreferenceRequest,
     CreatePreferenceResponse,
 )
-from app.features.services.paymentService import create_payment_preference
+from app.services.paymentService import create_payment_preference
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 

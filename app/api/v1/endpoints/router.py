@@ -13,7 +13,7 @@ from app.models.description import Description
 from app.models.productImage import ProductImage
 from app.schemas.create_products import (CreateProductRequest,CreateProductResponse,)
 from app.schemas.product_images import ProductImageResponse
-from app.features.products.service import generate_unique_slug, upload_to_supabase
+from app.services.service import generate_unique_slug, upload_to_supabase
 
 
 router = APIRouter(

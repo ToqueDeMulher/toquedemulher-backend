@@ -1,7 +1,7 @@
 import uuid
 import mercadopago
 from app.core.settings import settings
-from app.features.services.mercadopago_client import get_mp_sdk
+from app.services.mercadopago_client import get_mp_sdk
 
 
 def create_payment_preference(order_id: str, payer_email: str, items: list[dict]):

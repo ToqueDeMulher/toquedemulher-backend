@@ -6,10 +6,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.db import create_db_and_tables
 from app.core.settings import settings
-from app.features.products.router import router as products_router
-from routers.payment import router as payments_router
-
-
+from app.api.v1.endpoints.router import router as products_router
+from app.api.v1.endpoints.payment import router as payments_router
 
 
 app = FastAPI(title="Toque de Mulher API")
