@@ -1,14 +1,15 @@
 from fastapi import APIRouter, HTTPException, Request
-from app.schemas.create_preference import (
-    CreatePreferenceRequest,
-    CreatePreferenceResponse,
-)
+from app.schemas.create_preference import (CreatePreferenceRequest,CreatePreferenceResponse)
 from app.services.paymentService import create_payment_preference
+from app.models.payment import Payment, PaymentStatus
+from decimal import Decimal
+from app.core.db import _SessionDep
+
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 @router.post("/preference", response_model=CreatePreferenceResponse)
-def create_preference(payload: CreatePreferenceRequest):
+def create_preference(payload: CreatePreferenceRequest, session: _SessionDep):
     try:
         items = [
             {
@@ -21,25 +22,42 @@ def create_preference(payload: CreatePreferenceRequest):
             for item in payload.items
         ]
 
-        result = create_payment_preference(
-            order_id=payload.order_id,
-            payer_email=payload.payer_email,
-            items=items,
+        result = create_payment_preference(payload)
+
+        total_amount = sum(Decimal(str(item.unit_price)) * item.quantity
+            for item in payload.items
         )
 
-        if not result["preference_id"]:
+        payment = Payment(
+            order_id=payload.order_id,
+            status=PaymentStatus.PENDING,
+            payer_email=payload.payer_email,
+            amount=total_amount,
+            provider_preference_id=result.preference_id,
+)
+        
+        session.add(payment)
+        session.commit()
+        session.refresh(payment)
+        
+
+
+
+        
+
+        if not result.preference_id:
             raise HTTPException(
                 status_code=400,
                 detail={
                     "message": "Mercado Pago não retornou a preference_id",
-                    "mercado_pago_response": result["raw"]
+                    "mercado_pago_response": result.raw
                 }
             )
 
         return CreatePreferenceResponse(
-            preference_id=result["preference_id"],
-            init_point=result["init_point"],
-            sandbox_init_point=result["sandbox_init_point"],
+            preference_id=result.preference_id,
+            init_point=result.init_point,
+            sandbox_init_point=result.sandbox_init_point,
         )
 
     except HTTPException:

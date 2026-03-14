@@ -1,23 +1,42 @@
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Annotated
 from uuid import UUID, uuid4
 from datetime import datetime, date
 
 from sqlalchemy import CheckConstraint
-from sqlmodel import SQLModel, Field, Relationship, create_engine
+from sqlmodel import SQLModel, Field, Relationship, create_engine, Session
 from app.core.settings import settings
 from app.core.time import utc_now
+from fastapi import Depends
 
-if TYPE_CHECKING:
-    from app.models.product import Product
-    from app.models.productImage import ProductImage
-    from app.models.productReview import ProductReview
+from app.models.product import Product
+from app.models.productImage import ProductImage
+from app.models.productReview import ProductReview
 
 
 # ======================================================
 # ENGINE
 # ======================================================
+class Database:
 
-engine = create_engine(settings.DATABASE_URL, echo=settings.SQL_ECHO)
+    engine = create_engine(settings.DATABASE_URL, echo=True) 
+
+    @staticmethod
+    def create_db_and_tables():
+        SQLModel.metadata.create_all(Database.engine)
+
+    @staticmethod
+    def get_session():
+        with Session(Database.engine) as session:
+            yield session
+    
+    @staticmethod
+    def SessionLocal() -> Session:
+        return Session(Database.engine)
+
+
+_SessionDep = Annotated[Session, Depends(Database.get_session)]
+
+Database.SessionDep = _SessionDep
 
 
 # ======================================================
@@ -147,7 +166,6 @@ class PaymentMethod(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     type_name: str
 
-    payments: List["Payment"] = Relationship(back_populates="method")
 
 
 class Order(SQLModel, table=True):
@@ -169,7 +187,6 @@ class Order(SQLModel, table=True):
     cart: Optional[Cart] = Relationship(back_populates="order")
     address: Optional[Address] = Relationship(back_populates="orders")
     items: List["OrderItem"] = Relationship(back_populates="order")
-    payments: List["Payment"] = Relationship(back_populates="order")
     coupons: List["Coupon"] = Relationship(back_populates="orders", link_model=OrderCouponLink)
 
 
@@ -191,21 +208,7 @@ class OrderItem(SQLModel, table=True):
     product: Optional["Product"] = Relationship(back_populates="order_items")
 
 
-class Payment(SQLModel, table=True):
-    __tablename__ = "payment"
-    __table_args__ = (
-        CheckConstraint("amount >= 0", name="ck_payment_amount_non_negative"),
-    )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    order_id: int = Field(foreign_key="order.id", index=True)
-    method_id: int = Field(foreign_key="payment_method.id", index=True)
-
-    amount: float
-    payment_date: datetime = Field(default_factory=utc_now)
-
-    order: Optional[Order] = Relationship(back_populates="payments")
-    method: Optional[PaymentMethod] = Relationship(back_populates="payments")
 
 
 # ======================================================
@@ -233,18 +236,5 @@ class Coupon(SQLModel, table=True):
     orders: List[Order] = Relationship(back_populates="coupons", link_model=OrderCouponLink)
 
 
-def create_db_and_tables():
-    print("Criando tabelas no banco...")
-
-    
-    SQLModel.metadata.create_all(engine)
-    print("Tabelas criadas com sucesso!")
-
 
 # Dependencia para sessions em rotas
-
-def get_session():
-    from sqlmodel import Session
-
-    with Session(engine) as session:
-        yield session

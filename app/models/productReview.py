@@ -3,9 +3,13 @@ from uuid import UUID
 from datetime import datetime
 from sqlalchemy import CheckConstraint
 from sqlmodel import SQLModel, Field, Relationship
-from app.core.db import UserInDB
 from app.core.time import utc_now
-from app.models.product import Product
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from app.core.db import UserInDB
+    from app.models.product import Product
 
 class ProductReview(SQLModel, table=True):
     __tablename__ = "product_review"
@@ -22,5 +26,5 @@ class ProductReview(SQLModel, table=True):
     comment: Optional[str] = None
     created_at: datetime = Field(default_factory=utc_now)
 
-    product: Optional[Product] = Relationship(back_populates="reviews")
-    user: Optional[UserInDB] = Relationship(back_populates="reviews")
+    product: Optional["Product"] = Relationship(back_populates="reviews")
+    user: Optional["UserInDB"] = Relationship(back_populates="reviews")

@@ -4,10 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.core.db import create_db_and_tables
+from app.core.db import Database
 from app.core.settings import settings
 from app.api.v1.endpoints.router import router as products_router
-from app.api.v1.endpoints.payment import router as payments_router
+from app.api.v1.endpoints.paymentPreference import router as payments_router
 
 
 app = FastAPI(title="Toque de Mulher API")
@@ -31,7 +31,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.on_event("startup")
 def on_startup():
-    create_db_and_tables()
+    Database.create_db_and_tables()
 
 
 app.include_router(products_router)

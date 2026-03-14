@@ -3,7 +3,7 @@ from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlmodel import Session, select
-from app.core.db import get_session
+from app.core.db import Database
 from app.models.stock import Stock
 from app.models.category import Category
 from app.models.product import Product
@@ -31,7 +31,7 @@ ALLOWED_IMAGE_TYPES = {
 @router.post("", response_model=CreateProductResponse)
 def create_product(
     payload: CreateProductRequest,
-    session: Session = Depends(get_session),
+    session: Session = Depends(Database.get_session),
 ):
     try:
         # 1) SUPPLIER (busca ou cria)
@@ -178,7 +178,7 @@ async def upload_product_image(
     file: UploadFile = File(...),
     order: Optional[int] = Form(None),
     alt_text: Optional[str] = Form(None),
-    session: Session = Depends(get_session),
+    session: Session = Depends(Database.get_session),
 ):
     product = session.get(Product, product_id)
     if not product:

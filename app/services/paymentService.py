@@ -1,16 +1,24 @@
-import uuid
+from uuid import uuid4
 import mercadopago
-from app.core.settings import settings
 from app.services.mercadopago_client import get_mp_sdk
 from app.schemas.create_preference import CreatePreferenceRequest, CreatePreferenceResponse
 
 
 
-def create_payment_preference(preference: CreatePreferenceRequest)-> CreatePreferenceResponse:
+def create_payment_preference(preference: CreatePreferenceRequest,) -> CreatePreferenceResponse:
     sdk = get_mp_sdk()
 
     preference_data = {
-        "items": preference.items,
+        "items": [
+            {
+                "id": item.id,
+                "title": item.title,
+                "quantity": item.quantity,
+                "currency_id": "BRL",
+                "unit_price": item.unit_price,
+            }
+            for item in preference.items
+        ],
         "payer": {
             "email": preference.payer_email
         },
@@ -19,7 +27,7 @@ def create_payment_preference(preference: CreatePreferenceRequest)-> CreatePrefe
 
     request_options = mercadopago.config.RequestOptions()
     request_options.custom_headers = {
-        "x-idempotency-key": str(uuid.uuid4()) #evitar duplicidades
+        "x-idempotency-key": str(uuid4())
     }
 
     print("PREFERENCE DATA:", preference_data)
@@ -31,11 +39,10 @@ def create_payment_preference(preference: CreatePreferenceRequest)-> CreatePrefe
     response = result.get("response", {})
     print("RESPONSE MP:", response)
 
-    preferenceResponde = CreatePreferenceResponse(
-        preference_id = response.get("id"),
-        init_point = response.get("init_point"),
-        sandbox_init_point = response.get("sandbox_init_point"),
-        raw = response,
+    return CreatePreferenceResponse(
+        preference_id=response.get("id"),
+        init_point=response.get("init_point"),
+        sandbox_init_point=response.get("sandbox_init_point"),
+        raw=response,
     )
-
-    return preferenceResponde
+    
