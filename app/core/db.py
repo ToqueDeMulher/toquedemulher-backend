@@ -8,9 +8,12 @@ from app.core.settings import settings
 from app.core.time import utc_now
 from fastapi import Depends
 
+from app.models.user import UserInDB
 from app.models.product import Product
+from app.models.userRoleLink import UserRoleLink
 from app.models.productImage import ProductImage
 from app.models.productReview import ProductReview
+
 
 
 # ======================================================
@@ -43,9 +46,6 @@ Database.SessionDep = _SessionDep
 # TABELAS DE LIGACAO (N:N)
 # ======================================================
 
-class UserRoleLink(SQLModel, table=True):
-    user_id: UUID = Field(foreign_key="userindb.id", primary_key=True)
-    role_id: int = Field(foreign_key="roleindb.id", primary_key=True)
 
 
 class OrderCouponLink(SQLModel, table=True):
@@ -67,32 +67,6 @@ class RoleInDB(SQLModel, table=True):
         back_populates="roles",
         link_model=UserRoleLink,
     )
-
-
-class UserInDB(SQLModel, table=True):
-    __tablename__ = "userindb"
-
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    first_name: str
-    last_name: str
-    cpf: str
-    email: str = Field(index=True, unique=True)
-    hashed_password: str
-    phone: Optional[str] = None
-
-    gender: Optional[str] = None
-    birth_date: Optional[date] = None
-    accepts_marketing: bool = Field(default=False)
-
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
-    deleted_at: Optional[datetime] = None
-
-    roles: List[RoleInDB] = Relationship(back_populates="users", link_model=UserRoleLink)
-    addresses: List["Address"] = Relationship(back_populates="user")
-    orders: List["Order"] = Relationship(back_populates="user")
-    carts: List["Cart"] = Relationship(back_populates="user")
-    reviews: List["ProductReview"] = Relationship(back_populates="user")
 
 
 class Address(SQLModel, table=True):
