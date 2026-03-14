@@ -1,6 +1,7 @@
 from typing import List
 from uuid import UUID
 from pydantic import BaseModel, Field
+
 from app.schemas.products import ProductRequest
 from app.schemas.suppliers import SupplierRequest
 from app.schemas.brands import BrandRequest

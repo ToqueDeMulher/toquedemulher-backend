@@ -22,6 +22,7 @@ class ProductRequest(BaseModel):
     hypoallergenic: bool = False
 
 
+
 class ProductResponse(BaseModel):
     id: UUID
     slug: str

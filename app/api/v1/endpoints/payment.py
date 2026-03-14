@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
-from app.schemas.payments import (
+from app.schemas.create_preference import (
     CreatePreferenceRequest,
     CreatePreferenceResponse,
 )
@@ -48,6 +48,7 @@ def create_preference(payload: CreatePreferenceRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Serve para receber a notificação do Mercado Pago, quando acontecer alguma atualização relacionada ao pagamento.
 @router.post("/webhook")
 async def mercado_pago_webhook(request: Request):
     body = await request.json()
