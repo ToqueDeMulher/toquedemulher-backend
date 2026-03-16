@@ -1,71 +1,40 @@
+from fastapi import APIRouter, Depends
+from sqlmodel import Session
 from uuid import uuid4
-
-from fastapi import APIRouter, HTTPException, Request
-from app.schemas.create_preference import (CreatePreferenceRequest,CreatePreferenceResponse , CreatePreferenceRequestWithOrder)
-from app.services.paymentService import create_payment_preference
-from app.models.payment import Payment, PaymentStatus
 from decimal import Decimal
-from app.core.db import _SessionDep
 
+from app.schemas.payment_schema import CreateCheckoutRequest, CheckoutResponse
+from app.services.paymentService import create_checkout_session
+from app.models.payment import Payment, PaymentStatus
+from app.core.db import _SessionDep
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
-@router.post("/preference", response_model=CreatePreferenceResponse)
-def create_preference(payload: CreatePreferenceRequest, session: _SessionDep):
-    try:
-        items = [
-            {
-                "id": item.id,
-                "title": item.title,
-                "quantity": item.quantity,
-                "currency_id": "BRL",
-                "unit_price": item.unit_price,
-            }
-            for item in payload.items
-        ]
 
-        payload_with_order = CreatePreferenceRequestWithOrder(
-            order_id=str(uuid4()),
-            payer_email=payload.payer_email,
-            items=payload.items,
-)
-        result = create_payment_preference(payload_with_order)
+@router.post("/checkout", response_model=CheckoutResponse)
+def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep):
 
-        total_amount = sum(Decimal(str(item.unit_price)) * item.quantity
-            for item in payload.items
-        )
+    order_id = uuid4()
 
-        payment = Payment(
-            order_id=payload_with_order.order_id,
-            status=PaymentStatus.PENDING,
-            payer_email=payload.payer_email,
-            amount=total_amount,
-            provider_preference_id=result.preference_id,
-)
-        
-        session.add(payment)
-        session.commit()
-        session.refresh(payment)
-        
+    stripe_session = create_checkout_session(payload, order_id)
 
-        if not result.preference_id:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "message": "Mercado Pago não retornou a preference_id",
-                    "mercado_pago_response": result.raw
-                }
-            )
+    total_amount = sum(
+        Decimal(str(item.unit_price)) * item.quantity
+        for item in payload.items
+    )
 
-        return CreatePreferenceResponse(
-            preference_id=result.preference_id,
-            init_point=result.init_point,
-            sandbox_init_point=result.sandbox_init_point,
-        )
+    payment = Payment(
+        order_id=order_id,
+        payer_email=payload.payer_email,
+        amount=total_amount,
+        provider_session_id=stripe_session.id,
+        status=PaymentStatus.PENDING
+    )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    session.add(payment)
+    session.commit()
 
-
+    return CheckoutResponse(
+        checkout_url=stripe_session.url,
+        order_id=str(order_id)
+    )

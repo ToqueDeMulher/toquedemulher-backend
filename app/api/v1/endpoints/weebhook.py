@@ -1,55 +1,49 @@
+import stripe
+from fastapi import APIRouter, Request, HTTPException
 from uuid import UUID
+from sqlmodel import select
 
-from fastapi import APIRouter, Request, Depends
-from sqlmodel import Session, select
-from app.core.db import Database
+from app.core.settings import settings
+from app.core.db import _SessionDep
 from app.models.payment import Payment, PaymentStatus
-from app.services.mercadopago_client import get_mp_sdk
-
-router = APIRouter(prefix="/payments", tags=["payments"])
 
 
-@router.post("/webhook")
-async def payment_webhook(request: Request, session: Session = Depends(Database.get_session)):
-    body = await request.json()
+router = APIRouter()
 
-    event_type = body.get("type")
-    data = body.get("data", {})
-    provider_payment_id = data.get("id")
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    if event_type != "payment" or not provider_payment_id:
-        return {"status": "ignored"}
 
-    sdk = get_mp_sdk()
-    mp_result = sdk.payment().get(provider_payment_id)
-    mp_response = mp_result.get("response", {})
+@router.post("/payments/webhook")
+async def stripe_webhook(request: Request):
 
-    external_reference = mp_response.get("external_reference")
-    provider_status = mp_response.get("status")
+    payload = await request.body()
 
-    if not external_reference:
-        return {"status": "missing_external_reference"}
+    sig_header = request.headers.get("stripe-signature")
 
-    payment = session.exec(select(Payment).where(Payment.order_id == UUID(external_reference))).first()
+    try:
+        event = stripe.Webhook.construct_event(
+            payload,
+            sig_header,
+            settings.STRIPE_WEBHOOK_SECRET
+        )
+    except Exception as e:
+        print("Erro webhook:", e)
+        raise HTTPException(status_code=400)
 
-    if not payment:
-        return {"status": "payment_not_found"}
+    print("Evento recebido:", event["type"])
 
-    payment.provider_payment_id = str(provider_payment_id)
+    if event["type"] == "checkout.session.completed":
 
-    if provider_status == "approved":
-        payment.status = PaymentStatus.APPROVED
-    elif provider_status == "rejected":
-        payment.status = PaymentStatus.REJECTED
-    elif provider_status == "cancelled":
-        payment.status = PaymentStatus.CANCELLED
-    elif provider_status == "refunded":
-        payment.status = PaymentStatus.REFUNDED
-    else:
-        payment.status = PaymentStatus.PENDING
+        session_data = event["data"]["object"]
 
-    session.add(payment)
-    session.commit()
-    session.refresh(payment)
+        metadata = session_data.get("metadata", {})
+
+        order_id = metadata.get("order_id")
+
+        payment_intent = session_data.get("payment_intent")
+
+        print("Pagamento aprovado")
+        print("Order ID:", order_id)
+        print("Payment Intent:", payment_intent)
 
     return {"status": "ok"}

@@ -1,44 +1,40 @@
-from uuid import uuid4
-import mercadopago
+import stripe
+from uuid import UUID
 from app.core.settings import settings
-from app.schemas.create_preference import (
-    CreatePreferenceResponse,CreatePreferenceRequestWithOrder
-)
-from app.services.mercadopago_client import get_mp_sdk
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
-def create_payment_preference(preference: CreatePreferenceRequestWithOrder) -> CreatePreferenceResponse:
-    sdk = get_mp_sdk()
+def create_checkout_session(payload, order_id: UUID):
 
-    preference_data = {
-        "items": [
+    session = stripe.checkout.Session.create(
+
+        payment_method_types=["card"],
+
+        line_items=[
             {
-                "id": item.id,
-                "title": item.title,
+                "price_data": {
+                    "currency": "brl",
+                    "product_data": {
+                        "name": item.title,
+                    },
+                    "unit_amount": int(item.unit_price * 100),
+                },
                 "quantity": item.quantity,
-                "currency_id": "BRL",
-                "unit_price": item.unit_price,
             }
-            for item in preference.items
+            for item in payload.items
         ],
-        "payer": {
-            "email": preference.payer_email
+
+        mode="payment",
+
+        customer_email=payload.payer_email,
+
+        metadata={
+            "order_id": str(order_id)
         },
-        "external_reference": preference.order_id,
-        "notification_url": settings.MERCADO_PAGO_WEBHOOK_URL,
-    }
 
-    request_options = mercadopago.config.RequestOptions()
-    request_options.custom_headers = {
-        "x-idempotency-key": str(uuid4())
-    }
-
-    result = sdk.preference().create(preference_data, request_options)
-    response = result.get("response", {})
-
-    return CreatePreferenceResponse(
-        preference_id=response.get("id"),
-        init_point=response.get("init_point"),
-        sandbox_init_point=response.get("sandbox_init_point"),
-        raw=response,
+        success_url="http://localhost:3000/success",
+        cancel_url="http://localhost:3000/cancel",
     )
+
+    return session

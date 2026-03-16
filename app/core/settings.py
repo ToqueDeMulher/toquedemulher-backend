@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     SUPABASE_FOLDER: str = "products"
     SUPABASE_TIMEOUT: float = 20.0
     PRODUCT_IMAGE_MAX_BYTES: int = 5 * 1024 * 1024
+    MERCADO_PAGO_WEBHOOK_URL: str
+    STRIPE_SECRET_KEY: str
+    STRIPE_WEBHOOK_SECRET: str
 
 
 settings = Settings()
