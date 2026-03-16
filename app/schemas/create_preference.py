@@ -1,9 +1,14 @@
 from pydantic import BaseModel, EmailStr
 from typing import List
 from app.schemas.payments import PaymentItem
+from uuid import UUID
 
 class CreatePreferenceRequest(BaseModel):
-    order_id: str
+    payer_email: EmailStr
+    items: List[PaymentItem]
+
+class CreatePreferenceRequestWithOrder(BaseModel):
+    order_id: UUID
     payer_email: EmailStr
     items: List[PaymentItem]
 

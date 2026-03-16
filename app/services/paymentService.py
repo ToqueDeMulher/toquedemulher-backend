@@ -1,11 +1,13 @@
 from uuid import uuid4
 import mercadopago
+from app.core.settings import settings
+from app.schemas.create_preference import (
+    CreatePreferenceResponse,CreatePreferenceRequestWithOrder
+)
 from app.services.mercadopago_client import get_mp_sdk
-from app.schemas.create_preference import CreatePreferenceRequest, CreatePreferenceResponse
 
 
-
-def create_payment_preference(preference: CreatePreferenceRequest,) -> CreatePreferenceResponse:
+def create_payment_preference(preference: CreatePreferenceRequestWithOrder) -> CreatePreferenceResponse:
     sdk = get_mp_sdk()
 
     preference_data = {
@@ -23,6 +25,7 @@ def create_payment_preference(preference: CreatePreferenceRequest,) -> CreatePre
             "email": preference.payer_email
         },
         "external_reference": preference.order_id,
+        "notification_url": settings.MERCADO_PAGO_WEBHOOK_URL,
     }
 
     request_options = mercadopago.config.RequestOptions()
@@ -30,14 +33,8 @@ def create_payment_preference(preference: CreatePreferenceRequest,) -> CreatePre
         "x-idempotency-key": str(uuid4())
     }
 
-    print("PREFERENCE DATA:", preference_data)
-
     result = sdk.preference().create(preference_data, request_options)
-
-    print("RESULTADO COMPLETO MP:", result)
-
     response = result.get("response", {})
-    print("RESPONSE MP:", response)
 
     return CreatePreferenceResponse(
         preference_id=response.get("id"),
@@ -45,4 +42,3 @@ def create_payment_preference(preference: CreatePreferenceRequest,) -> CreatePre
         sandbox_init_point=response.get("sandbox_init_point"),
         raw=response,
     )
-    

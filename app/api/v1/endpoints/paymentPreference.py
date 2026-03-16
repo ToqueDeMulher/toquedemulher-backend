@@ -1,5 +1,7 @@
+from uuid import uuid4
+
 from fastapi import APIRouter, HTTPException, Request
-from app.schemas.create_preference import (CreatePreferenceRequest,CreatePreferenceResponse)
+from app.schemas.create_preference import (CreatePreferenceRequest,CreatePreferenceResponse , CreatePreferenceRequestWithOrder)
 from app.services.paymentService import create_payment_preference
 from app.models.payment import Payment, PaymentStatus
 from decimal import Decimal
@@ -22,14 +24,19 @@ def create_preference(payload: CreatePreferenceRequest, session: _SessionDep):
             for item in payload.items
         ]
 
-        result = create_payment_preference(payload)
+        payload_with_order = CreatePreferenceRequestWithOrder(
+            order_id=str(uuid4()),
+            payer_email=payload.payer_email,
+            items=payload.items,
+)
+        result = create_payment_preference(payload_with_order)
 
         total_amount = sum(Decimal(str(item.unit_price)) * item.quantity
             for item in payload.items
         )
 
         payment = Payment(
-            order_id=payload.order_id,
+            order_id=payload_with_order.order_id,
             status=PaymentStatus.PENDING,
             payer_email=payload.payer_email,
             amount=total_amount,
@@ -39,10 +46,6 @@ def create_preference(payload: CreatePreferenceRequest, session: _SessionDep):
         session.add(payment)
         session.commit()
         session.refresh(payment)
-        
-
-
-
         
 
         if not result.preference_id:
@@ -66,13 +69,3 @@ def create_preference(payload: CreatePreferenceRequest, session: _SessionDep):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Serve para receber a notificação do Mercado Pago, quando acontecer alguma atualização relacionada ao pagamento.
-@router.post("/webhook")
-async def mercado_pago_webhook(request: Request):
-    body = await request.json()
-    query_params = dict(request.query_params)
-
-    print("Webhook body:", body)
-    print("Webhook query:", query_params)
-
-    return {"status": "ok"}
