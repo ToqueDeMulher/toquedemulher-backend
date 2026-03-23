@@ -4,12 +4,19 @@ from datetime import datetime, date
 from sqlmodel import SQLModel, Field, Relationship
 from app.core.time import utc_now
 from app.models.productReview import ProductReview
-from app.models.userRoleLink import UserRoleLink
+from enum import Enum
+
+
+
+
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    CLIENT = "cliente"
 
 
 
 class UserInDB(SQLModel, table=True):
-    __tablename__ = "userindb"
+    __tablename__ = "user"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     name: str
@@ -26,7 +33,7 @@ class UserInDB(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
     deleted_at: Optional[datetime] = None
 
-    roles: List["RoleInDB"] = Relationship(back_populates="users", link_model=UserRoleLink) #type: ignore
+    role: str = Field(default=UserRole.CLIENT, nullable=False)
     addresses: List["Address"] = Relationship(back_populates="user")    #type: ignore
     orders: List["Order"] = Relationship(back_populates="user")         #type: ignore
     carts: List["Cart"] = Relationship(back_populates="user")           #type: ignore

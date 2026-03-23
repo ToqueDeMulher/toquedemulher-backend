@@ -16,10 +16,9 @@ class ProductReview(SQLModel, table=True):
     __table_args__ = (
         CheckConstraint("rating >= 1 AND rating <= 5", name="ck_product_review_rating_range"),
     )
-
     id: Optional[int] = Field(default=None, primary_key=True)
     product_id: UUID = Field(foreign_key="product.id", index=True)
-    user_id: UUID = Field(foreign_key="userindb.id", index=True)
+    user_id: UUID = Field(foreign_key="user.id", index=True)
 
     rating: int
     title: Optional[str] = None

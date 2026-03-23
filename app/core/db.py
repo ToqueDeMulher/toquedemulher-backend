@@ -1,6 +1,6 @@
-from typing import List, Optional, TYPE_CHECKING, Annotated
+from typing import List, Optional, Annotated
 from uuid import UUID, uuid4
-from datetime import datetime, date
+from datetime import datetime
 
 from sqlalchemy import CheckConstraint
 from sqlmodel import SQLModel, Field, Relationship, create_engine, Session
@@ -10,7 +10,6 @@ from fastapi import Depends
 
 from app.models.user import UserInDB
 from app.models.product import Product
-from app.models.userRoleLink import UserRoleLink
 from app.models.productImage import ProductImage
 from app.models.productReview import ProductReview
 
@@ -62,7 +61,7 @@ class Address(SQLModel, table=True):
     __tablename__ = "address"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: UUID = Field(foreign_key="userindb.id", index=True)
+    user_id: UUID = Field(foreign_key="user.id", index=True)
 
     cep: str
     street: str
@@ -89,7 +88,7 @@ class Cart(SQLModel, table=True):
     __tablename__ = "cart"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    user_id: UUID = Field(foreign_key="userindb.id", index=True)
+    user_id: UUID = Field(foreign_key="user.id", index=True)
 
     status: str = Field(default="ativo")
     created_at: datetime = Field(default_factory=utc_now)
@@ -138,7 +137,7 @@ class Order(SQLModel, table=True):
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: UUID = Field(foreign_key="userindb.id", index=True)
+    user_id: UUID = Field(foreign_key="user.id", index=True)
     cart_id: Optional[UUID] = Field(default=None, foreign_key="cart.id", index=True)
     address_id: int = Field(foreign_key="address.id", index=True)
 
