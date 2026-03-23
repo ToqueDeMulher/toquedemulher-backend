@@ -14,36 +14,44 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 @router.post("/payments/webhook")
-async def stripe_webhook(request: Request):
+async def stripe_webhook(request: Request, session: _SessionDep):
 
     payload = await request.body()
-
     sig_header = request.headers.get("stripe-signature")
 
-    try:
-        event = stripe.Webhook.construct_event(
-            payload,
-            sig_header,
-            settings.STRIPE_WEBHOOK_SECRET
-        )
-    except Exception as e:
-        print("Erro webhook:", e)
-        raise HTTPException(status_code=400)
+    event = stripe.Webhook.construct_event(
+        payload,
+        sig_header,
+        settings.STRIPE_WEBHOOK_SECRET
+    )
 
-    print("Evento recebido:", event["type"])
+    event_type = event["type"]
 
-    if event["type"] == "checkout.session.completed":
+    EVENT_STATUS_MAP = {
+    "checkout.session.completed": PaymentStatus.APPROVED,
+    "payment_intent.payment_failed": PaymentStatus.REJECTED,
+    "charge.refunded": PaymentStatus.REFUNDED
+}
+    if event_type in EVENT_STATUS_MAP:
 
-        session_data = event["data"]["object"]
+        data = event["data"]["object"]
 
-        metadata = session_data.get("metadata", {})
+        order_id = data["metadata"]["order_id"]
 
-        order_id = metadata.get("order_id")
+        status = EVENT_STATUS_MAP[event_type]
 
-        payment_intent = session_data.get("payment_intent")
+        payment_intent = data.get("payment_intent")
 
-        print("Pagamento aprovado")
-        print("Order ID:", order_id)
-        print("Payment Intent:", payment_intent)
+        payment = session.exec(
+            select(Payment).where(Payment.order_id == order_id)
+        ).first()
 
-    return {"status": "ok"}
+        if payment and payment.status != status:
+
+            payment.status = status
+            payment.provider_payment_id = payment_intent
+
+            session.add(payment)
+            session.commit()
+
+        return {"status": "ok"}

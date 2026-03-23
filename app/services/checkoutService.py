@@ -9,7 +9,10 @@ def create_checkout_session(payload, order_id: UUID):
 
     session = stripe.checkout.Session.create(
 
-        payment_method_types=["card"],
+         payment_method_types=[
+            "card",
+            "boleto"
+        ],
 
         line_items=[
             {

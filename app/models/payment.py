@@ -19,16 +19,15 @@ class PaymentStatus(str, Enum):
     REFUNDED  = "refunded"
 
 class Payment(SQLModel, table=True):
-    __tablename__ = "payments"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     order_id: UUID = Field(nullable=False, index=True)
-    provider: str = Field(default="mercado_pago", nullable=False)
+    provider: str = Field(default="stripe", nullable=False)
     status: str = Field(default=PaymentStatus.PENDING, nullable=False, index=True)
     payer_email: str = Field(nullable=False, max_length=255)
     amount: Decimal = Field(sa_column=Column(Numeric(10, 2), nullable=False))
     currency: str = Field(default="BRL", nullable=False, max_length=10)
-    provider_preference_id: Optional[str] = Field(default=None, max_length=255, index=True)
+    provider_session_id: Optional[str] = Field(default=None, max_length=255, index=True)
     provider_payment_id: Optional[str] = Field(default=None, max_length=255, index=True)
     created_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
     updated_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))

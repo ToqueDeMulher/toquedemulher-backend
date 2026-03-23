@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.db import Database
 from app.core.settings import settings
 from app.api.v1.endpoints.router import router as products_router
-from app.api.v1.endpoints.paymentPreference import router as payments_router
+from app.api.v1.endpoints.stripeCheckout import router as payments_router
 from app.api.v1.endpoints.createUser import router as crateUser
 from app.api.v1.endpoints.weebhook import router as weebhook
 

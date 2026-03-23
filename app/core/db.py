@@ -57,17 +57,6 @@ class OrderCouponLink(SQLModel, table=True):
 # USER, ROLES, ENDERECOS
 # ======================================================
 
-class RoleInDB(SQLModel, table=True):
-    __tablename__ = "roleindb"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-
-    users: List["UserInDB"] = Relationship(
-        back_populates="roles",
-        link_model=UserRoleLink,
-    )
-
 
 class Address(SQLModel, table=True):
     __tablename__ = "address"
