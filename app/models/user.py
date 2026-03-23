@@ -6,14 +6,9 @@ from app.core.time import utc_now
 from app.models.productReview import ProductReview
 from enum import Enum
 
-
-
-
 class UserRole(str, Enum):
     ADMIN = "admin"
     CLIENT = "cliente"
-
-
 
 class UserInDB(SQLModel, table=True):
     __tablename__ = "user"
@@ -38,3 +33,5 @@ class UserInDB(SQLModel, table=True):
     orders: List["Order"] = Relationship(back_populates="user")         #type: ignore
     carts: List["Cart"] = Relationship(back_populates="user")           #type: ignore
     reviews: List["ProductReview"] = Relationship(back_populates="user")
+    payments: List["Payment"] = Relationship(back_populates="user")     #type: ignore
+    

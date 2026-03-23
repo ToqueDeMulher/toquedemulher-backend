@@ -1,18 +1,17 @@
+from decimal import Decimal
 from pydantic import BaseModel
+from uuid import UUID
 from typing import List
 
-
-class PaymentItem(BaseModel):
-    title: str
+class CheckoutProductRequest(BaseModel):
+    id: UUID
+    name: str
+    product_url: str
+    unit_price: Decimal
     quantity: int
-    unit_price: float
-
 
 class CreateCheckoutRequest(BaseModel):
-    payer_email: str
-    items: List[PaymentItem]
-
+    items: List[CheckoutProductRequest]
 
 class CheckoutResponse(BaseModel):
     checkout_url: str
-    order_id: str
