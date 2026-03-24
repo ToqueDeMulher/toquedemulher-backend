@@ -2,6 +2,16 @@ from typing import Annotated
 from sqlmodel import SQLModel, create_engine, Session
 from app.core.settings import settings
 
+from app.models.coupon import Coupon
+from app.models.user import UserInDB
+from app.models.address import Address
+from app.models.product import Product
+from app.models.cart import Cart
+from app.models.cartItem import CartItem
+from app.models.payment import Payment
+from app.models.paymentItem import PaymentItem
+from app.models.order import Order
+from app.models.orderItem import OrderItem
 from fastapi import Depends
 
 

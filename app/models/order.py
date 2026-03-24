@@ -29,5 +29,5 @@ class Order(SQLModel, table=True):
     user: Optional[UserInDB] = Relationship(back_populates="orders")
     cart: Optional[Cart] = Relationship(back_populates="order")
     address: Optional[Address] = Relationship(back_populates="orders")
-    items: List["OrderItem"] = Relationship(back_populates="order")
-    coupons: List["Coupon"] = Relationship(back_populates="orders", link_model=OrderCouponLink)
+    items: List["OrderItem"] = Relationship(back_populates="order") #type: ignore
+    coupons: List["Coupon"] = Relationship(back_populates="orders", link_model=OrderCouponLink) #type: ignore

@@ -27,6 +27,7 @@ class UserInDB(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
     deleted_at: Optional[datetime] = None
+    disabled: bool = Field(default=False)
 
     role: str = Field(default=UserRole.CLIENT, nullable=False)
     addresses: List["Address"] = Relationship(back_populates="user")    #type: ignore

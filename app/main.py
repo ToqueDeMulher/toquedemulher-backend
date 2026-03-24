@@ -10,6 +10,7 @@ from app.api.v1.endpoints.router import router as products_router
 from app.api.v1.endpoints.stripeCheckout import router as payments_router
 from app.api.v1.endpoints.createUser import router as crateUser
 from app.api.v1.endpoints.weebhook import router as weebhook
+from app.api.v1.endpoints.login import router as login
 
 
 
@@ -41,3 +42,4 @@ app.include_router(products_router)
 app.include_router(payments_router)
 app.include_router(crateUser)
 app.include_router(weebhook)
+app.include_router(login)

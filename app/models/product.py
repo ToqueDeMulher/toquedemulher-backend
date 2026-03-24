@@ -47,10 +47,7 @@ class Product(SQLModel, table=True):
     brand: Optional[Brand] = Relationship(back_populates="products")
     description: Optional[Description] = Relationship(back_populates="products")
 
-    categories: List[Category] = Relationship(
-        back_populates="products",
-        link_model=CategoryProductLink,
-    )
+    categories: List[Category] = Relationship(back_populates="products",link_model=CategoryProductLink)
     stock_items: List[Stock] = Relationship(back_populates="product")       #type: ignore
     images: List["ProductImage"] = Relationship(back_populates="product")   #type: ignore
     reviews: List["ProductReview"] = Relationship(back_populates="product") #type: ignore

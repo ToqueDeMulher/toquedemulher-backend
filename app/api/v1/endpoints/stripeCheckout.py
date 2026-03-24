@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, Depends
-from app.models.paymenyItem import PaymentItem
 from uuid import uuid4
 from decimal import Decimal
 from app.schemas.create_checkout import CreateCheckoutRequest, CheckoutResponse
@@ -9,17 +8,17 @@ from app.core.db import _SessionDep
 from app.services.loginService import LoginAndJWT
 from typing import Annotated
 from app.models.user import UserInDB
-from app.models.paymenyItem import PaymentItem
+from app.models.paymentItem import PaymentItem
 
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 @router.post("/checkout", response_model=CheckoutResponse)
 def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: Annotated[UserInDB, Depends(LoginAndJWT.get_current_active_user)] ): #Checkout é literalmente a tela de pagamento
- 
-    if not user:
-        raise HTTPException(400, message = "Usuário precisa estar logado para fazer uma compra")
-    
+     
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="Nenhum item enviado para checkout")
+
     order_id = uuid4()
 
     total_amount = sum(
@@ -32,6 +31,7 @@ def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: 
 
         payment = Payment(
             order_id=order_id,
+            user_id=user.id,
             payer_email=user.email,
             amount=total_amount,
             provider_session_id=stripe_session.id,

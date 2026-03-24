@@ -3,7 +3,6 @@ from uuid import UUID, uuid4
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
 from app.core.time import utc_now
-from app.models.user import UserInDB
 
 
 class Cart(SQLModel, table=True):
@@ -16,6 +15,6 @@ class Cart(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
-    user: Optional[UserInDB] = Relationship(back_populates="carts")
-    items: List["CartItem"] = Relationship(back_populates="cart")   #type: ignore
-    order: Optional["Order"] = Relationship(back_populates="cart")  #type: ignore
+    user: Optional["UserInDB"] = Relationship(back_populates="carts")   #type: ignore
+    items: List["CartItem"] = Relationship(back_populates="cart")       #type: ignore
+    order: Optional["Order"] = Relationship(back_populates="cart")      #type: ignore

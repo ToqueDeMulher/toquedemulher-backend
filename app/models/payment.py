@@ -1,4 +1,3 @@
-from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List
@@ -23,7 +22,7 @@ class PaymentStatus(str, Enum):
 class Payment(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    user_id: UUID = Field(foreign_key="userindb.id", nullable=False, index=True)
+    user_id: UUID = Field(foreign_key="user.id", nullable=False, index=True)
     order_id: UUID = Field(nullable=False, index=True)
     
     provider: str = Field(default="stripe", nullable=False)

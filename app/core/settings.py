@@ -27,6 +27,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173"
     )
 
+    SECRET_KEY: str
     MERCADO_PAGO_ACCESS_TOKEN: str
     MERCADO_PAGO_PUBLIC_KEY: str
     MERCADO_PAGO_WEBHOOK_URL: str
