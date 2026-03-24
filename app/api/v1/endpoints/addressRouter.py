@@ -26,6 +26,8 @@ def create_address(
         session.commit()
         session.refresh(new_address)    
     except Exception as e:
+        session.rollback()
+        print("Erro ao criar address:", repr(e))
         raise HTTPException(500, detail= "Error no sistema")        
     
     return  Message(mensagem="Endereço criado com sucesso")

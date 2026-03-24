@@ -9,6 +9,8 @@ from app.services.loginService import LoginAndJWT
 from typing import Annotated
 from app.models.user import UserInDB
 from app.models.paymentItem import PaymentItem
+from sqlmodel import select
+from app.models.address import Address
 
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -18,6 +20,16 @@ def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: 
      
     if not payload.items:
         raise HTTPException(status_code=400, detail="Nenhum item enviado para checkout")
+    
+    address = session.exec(
+        select(Address).where(
+            Address.id == payload.address_id,
+            Address.user_id == user.id
+        )
+        ).first()
+    
+    if not address:
+        raise HTTPException(404, detail="Endereço não encontrado ou não pertence ao usuário" )
 
     order_id = uuid4()
 
@@ -32,6 +44,7 @@ def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: 
         payment = Payment(
             order_id=order_id,
             user_id=user.id,
+            address_id= payload.address_id,
             payer_email=user.email,
             amount=total_amount,
             provider_session_id=stripe_session.id,

@@ -20,10 +20,13 @@ class PaymentStatus(str, Enum):
     REFUNDED  = "refunded"
 
 class Payment(SQLModel, table=True):
+    __tablename__ = "payment"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    user_id: UUID = Field(foreign_key="user.id", nullable=False, index=True)
     order_id: UUID = Field(nullable=False, index=True)
+
+    user_id: UUID = Field(foreign_key="user.id", nullable=False, index=True)
+    address_id: UUID = Field(foreign_key="address.id", nullable=False, index=True)
     
     provider: str = Field(default="stripe", nullable=False)
     status: str = Field(default=PaymentStatus.PENDING, nullable=False, index=True)
@@ -37,3 +40,4 @@ class Payment(SQLModel, table=True):
 
     items: List["PaymentItem"] = Relationship(back_populates="payment") #type: ignore 
     user: Optional["UserInDB"] = Relationship(back_populates="payments") #type: ignore 
+    address: Optional["Address"] = Relationship(back_populates="payments") #type: ignore 

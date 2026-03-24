@@ -10,7 +10,8 @@ class CheckoutProductRequest(BaseModel):
     unit_price: Decimal
     quantity: int
 
-class CreateCheckoutRequest(BaseModel):
+class CreateCheckoutRequest(BaseModel): 
+    address_id: UUID
     items: List[CheckoutProductRequest]
 
 class CheckoutResponse(BaseModel):
