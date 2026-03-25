@@ -75,4 +75,5 @@ def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: 
         raise HTTPException(500, detail="Erro ao criar checkout")
     
 
-    return CheckoutResponse(checkout_url=stripe_session.url,)
+    return CheckoutResponse(client_secret= stripe_session.client_secret,
+                            session_id = stripe_session.id)

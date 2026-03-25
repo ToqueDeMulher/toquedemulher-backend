@@ -15,4 +15,5 @@ class CreateCheckoutRequest(BaseModel):
     items: List[CheckoutProductRequest]
 
 class CheckoutResponse(BaseModel):
-    checkout_url: str
+    client_secret: str
+    session_id: str
