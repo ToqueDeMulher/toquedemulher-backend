@@ -1,6 +1,7 @@
 import stripe
 from uuid import UUID
 from app.core.settings import settings
+import time
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -27,6 +28,7 @@ def create_checkout_session(payload, order_id: UUID):
         },
         success_url="http://localhost:3000/success",
         cancel_url="http://localhost:3000/cancel",
+        expires_at=int(time.time()) + (30 * 60) 
     )
 
     return session
