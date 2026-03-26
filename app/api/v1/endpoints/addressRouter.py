@@ -6,14 +6,14 @@ from app.models.user import UserInDB
 from app.schemas.addresses import AddressRequest
 from app.models.address import Address
 from app.schemas.message import Message
-
+from app.api.dependencies import addToDB, CurrentUser
 router = APIRouter()
 
-@router.post("/addresses", response_model=Message)
+@router.post("/addresses", response_model=Message, status_code=201)
 def create_address(
     address_data: AddressRequest,
     session: _SessionDep,
-    user: Annotated[UserInDB, Depends(LoginAndJWT.get_current_active_user)]
+    user: CurrentUser
 ):
     
     try:
@@ -22,9 +22,8 @@ def create_address(
             user_id=user.id
         )
 
-        session.add(new_address)
-        session.commit()
-        session.refresh(new_address)    
+        addToDB(new_address)
+
     except Exception as e:
         session.rollback()
         print("Erro ao criar address:", repr(e))

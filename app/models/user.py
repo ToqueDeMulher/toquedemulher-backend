@@ -14,8 +14,8 @@ class UserInDB(SQLModel, table=True):
     __tablename__ = "user"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
-    name: str
-    cpf: str 
+    name: Optional[str] = None
+    cpf: Optional[str] = None
     email: str = Field(index=True, unique=True)
     hashed_password: str
     phone: Optional[str] = None

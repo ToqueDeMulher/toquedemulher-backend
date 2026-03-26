@@ -28,9 +28,6 @@ class Settings(BaseSettings):
     )
 
     SECRET_KEY: str
-    MERCADO_PAGO_ACCESS_TOKEN: str
-    MERCADO_PAGO_PUBLIC_KEY: str
-    MERCADO_PAGO_WEBHOOK_URL: str
     FRONTEND_SUCCESS_URL: str
     FRONTEND_PENDING_URL: str
     FRONTEND_FAILURE_URL: str
