@@ -1,5 +1,5 @@
 from app.models.user import UserInDB
-from app.schemas.user import UserRequest, UserResponse, ChangeUserInformationRequest, ChangeEmailRequest, ChangePasswordRequest
+from app.schemas.user import UserRequest, UserResponse, ChangeUserInformationRequest, ChangeEmailRequest, ChangePasswordRequest, GetUserResponse
 from sqlmodel import select
 from fastapi import HTTPException, APIRouter
 from app.services.loginService import LoginAndJWT
@@ -7,9 +7,7 @@ from app.core.db import _SessionDep
 from app.api.dependencies import CurrentUser, addToDB
 from app.schemas.message import Message
 
-# PUT /user/changeProfile → nome, telefone, etc.
-# PUT /user/changeEmail → fluxo separado
-# PUT /user/changePassword → fluxo separado
+
 router = APIRouter(prefix="/user")
 
 @router.post("/createUser", status_code=201) #201 = created
@@ -31,6 +29,15 @@ def create_user(user: UserRequest, session: _SessionDep) -> UserResponse:
     print("Usuário para 'salvar' no banco de dados:", db_user)
 
     return UserResponse(message=F"Usuario criado com sucesso")
+
+@router.get("/me", response_model=GetUserResponse)
+def getUser(session: _SessionDep, user: CurrentUser):
+    db_user = session.get(UserInDB, user.id)
+
+    if not db_user:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    return db_user
 
 @router.put("/me")
 def changeUserInformartions(userInformations: ChangeUserInformationRequest, session: _SessionDep, user: CurrentUser):
