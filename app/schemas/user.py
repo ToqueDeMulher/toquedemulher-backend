@@ -2,18 +2,14 @@ from datetime import date
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr
-class getUserResponse(BaseModel):
+class GetUserResponse(BaseModel):
     name: Optional[str] = None
     cpf: Optional[str] = None
-    email: str 
+    email: EmailStr 
     phone: Optional[str] = None
     gender: Optional[str] = None
     birth_date: Optional[date] = None
     accepts_marketing: Optional[bool] = None
-
-
-class UserResponse(BaseModel):
-    message: str
 
 class UserRequest(BaseModel):
     email: EmailStr
@@ -25,12 +21,19 @@ class ChangeUserInformationRequest(BaseModel):
     phone: Optional[str] = None
     gender: Optional[str] = None
     birth_date: Optional[date] = None
+    accepts_marketing: Optional[bool] = None
+
 
 class ChangeEmailRequest(BaseModel):
     new_email: EmailStr
 
 class ChangePasswordRequest(BaseModel):
+    current_password: str
     new_password: str
+
+class DeleteAccountRequest(BaseModel):
+    current_password: str
+    confirm_text: str
 
 class Token (BaseModel):
     access_token: str
@@ -40,5 +43,5 @@ class TokenData(BaseModel):
     username: str | None = None
 
 class Login(BaseModel):
-    email: str
+    email: EmailStr
     password: str
