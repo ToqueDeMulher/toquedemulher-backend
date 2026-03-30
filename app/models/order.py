@@ -20,7 +20,7 @@ class Order(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: UUID = Field(foreign_key="user.id", index=True)
     cart_id: Optional[UUID] = Field(default=None, foreign_key="cart.id", index=True)
-    address_id: int = Field(foreign_key="address.id", index=True)
+    address_id: UUID = Field(foreign_key="address.id", index=True)
 
     order_date: datetime = Field(default_factory=utc_now)
     final_price: float

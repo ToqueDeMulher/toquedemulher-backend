@@ -30,7 +30,7 @@ def create_user(user: UserRequest, session: _SessionDep):
         hashed_password= LoginAndJWT.hashing_password(user.password),  
     )
 
-    addToDB(db_user)
+    addToDB(db_user, session)
     
     print("Usuário para 'salvar' no banco de dados:", db_user)
 
@@ -79,7 +79,7 @@ def changeUserInformation(userInformations: ChangeUserInformationRequest, sessio
     for key, value in update_data.items():
         setattr(db_user, key, value) #db_user.name = "name"
     
-    addToDB(db_user)
+    addToDB(db_user, session)
 
     return Message(mensagem= f"Usuário {db_user.name} atualizado com sucesso")
 
@@ -103,7 +103,7 @@ def changeEmail(data: ChangeEmailRequest, session: _SessionDep, user: CurrentUse
 
     db_user.email = data.new_email
 
-    addToDB(db_user)
+    addToDB(db_user, session)
 
     return Message(mensagem="Email atualizado com sucesso")
 
@@ -124,6 +124,6 @@ def changePassword(data: ChangePasswordRequest, user:CurrentUser, session: _Sess
 
     db_user.hashed_password = LoginAndJWT.hashing_password(data.new_password)
 
-    addToDB(db_user)
+    addToDB(db_user, session)
 
     return Message(mensagem="Senha alterada com sucesso")

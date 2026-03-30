@@ -1,13 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from uuid import uuid4
 from decimal import Decimal
 from app.schemas.create_checkout import CreateCheckoutRequest, CheckoutResponse
 from app.services.checkoutService import create_checkout_session
 from app.models.payment import Payment, PaymentStatus
 from app.core.db import _SessionDep
-from app.services.loginService import LoginAndJWT
-from typing import Annotated
-from app.models.user import UserInDB
+from app.api.dependencies import CurrentUser
 from app.models.paymentItem import PaymentItem
 from sqlmodel import select
 from app.models.address import Address
@@ -16,7 +14,7 @@ from app.models.address import Address
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 @router.post("/checkout", response_model=CheckoutResponse)
-def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: Annotated[UserInDB, Depends(LoginAndJWT.get_current_active_user)] ): #Checkout é literalmente a tela de pagamento
+def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: CurrentUser ): #Checkout é literalmente a tela de pagamento
      
     if not payload.items:
         raise HTTPException(status_code=400, detail="Nenhum item enviado para checkout")

@@ -23,7 +23,7 @@ def create_address(
             user_id=user.id
         )
 
-        addToDB(new_address)
+        addToDB(new_address, session)
 
     except Exception as e:
         session.rollback()
@@ -40,7 +40,7 @@ def getAddresses(user: CurrentUser, session: _SessionDep):
     
     return addresses
 
-@router.delete("/{address.id}")
+@router.delete("/{address_id}")
 def deleteAdrress(address_id: UUID, user: CurrentUser, session: _SessionDep):
 
     address_to_delete = session.get(Address, address_id)
@@ -83,7 +83,7 @@ def changeAddress(
         setattr(address, key, value)
     
     try:
-        addToDB(address)
+        addToDB(address, session)
     except Exception as e:
         session.rollback()
         print("Erro ao atualizar address:", repr(e))
