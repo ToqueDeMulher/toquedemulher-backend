@@ -16,7 +16,7 @@ from app.schemas.message import Message
 
 router = APIRouter(prefix="/user")
 
-@router.post("/createUser", status_code=201) #201 = created
+@router.post("/register", status_code=201) #201 = created
 def create_user(user: UserRequest, session: _SessionDep):
 
     query = select(UserInDB).where(UserInDB.email == user.email) #criando consulta
