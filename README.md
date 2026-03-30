@@ -237,6 +237,51 @@ A pasta `services/` já concentra parte da lógica de negócio da aplicação.
 
 ---
 
+## Testes da API com Bruno
+
+Para realizar os testes dos endpoints da API, foi utilizado o **Bruno** como cliente de requisições HTTP.
+
+O Bruno é a ferramenta adotada neste projeto para organizar, executar e versionar os requests da API durante o desenvolvimento. As coleções ficam salvas em arquivos locais, o que facilita o versionamento junto ao código-fonte no repositório. :contentReference[oaicite:0]{index=0}
+
+### Como o Bruno foi utilizado neste projeto
+
+Foi criada uma coleção da API contendo os endpoints desenvolvidos no backend, organizados por módulos. Entre eles:
+
+- autenticação
+- usuário
+- endereço
+- pagamento
+
+Além da organização por pastas, também foi configurado um **environment local** para reutilizar variáveis da aplicação, como a URL base da API e o token JWT de autenticação. O Bruno suporta variáveis de ambiente para tornar os requests reutilizáveis em diferentes contextos. :contentReference[oaicite:1]{index=1}
+
+Exemplo de variáveis utilizadas no ambiente local:
+
+baseUrl=http://127.0.0.1:8000
+token=
+
+### Como outros desenvolvedores podem usar o Bruno no projeto
+
+Para utilizar o Bruno neste projeto, os demais desenvolvedores devem seguir os passos abaixo:
+
+1. clonar o repositório do backend na máquina local;
+2. instalar o **Bruno**;
+3. abrir o Bruno e acessar a coleção salva dentro da pasta do projeto;
+4. selecionar o environment configurado para execução local;
+5. executar o request de login para obter o token JWT;
+6. informar o token na variável `token` do environment;
+7. utilizar os demais requests normalmente para testar os endpoints protegidos e públicos da API.
+
+### Estrutura esperada no projeto
+
+A coleção do Bruno deve estar disponível dentro do diretório do backend, por exemplo:
+
+backend/
+  bruno/
+    auth/
+    user/
+    address/
+    payment/
+
 ## 🧱 Base do sistema já pronta
 
 Com base na estrutura atual, o projeto já possui:
