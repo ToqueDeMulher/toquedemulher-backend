@@ -1,0 +1,28 @@
+info:
+  name: Change User Information
+  type: http
+  seq: 3
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/user/me"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Gustavo Henrique",
+        "cpf": "12345678901",
+        "phone": "61999998888",
+        "gender": "Masculino",
+        "birth_date": "2004-08-15",
+        "accepts_marketing": true
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc0ODkzODQ3fQ.2oB-O-Wy3rqkQhmcKIhHmt8WO1eSyIVGN0BCX4_Hbrk
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

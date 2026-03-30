@@ -1,0 +1,39 @@
+info:
+  name: New Payment
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/payments/checkout"
+  body:
+    type: json
+    data: |-
+      {
+        "address_id": "668e387e-4e91-4cb2-947a-75bee5773e90",
+        "items": [
+          {
+            "id": "33333333-3333-3333-3333-333333333333",
+            "name": "Body Splash Floral",
+            "product_url": "https://seudominio.com/produtos/body-splash-floral",
+            "unit_price": 79.90,
+            "quantity": 1
+          },
+          {
+            "id": "44444444-4444-4444-4444-444444444444",
+            "name": "Kit Skincare Noturno",
+            "product_url": "https://seudominio.com/produtos/kit-skincare-noturno",
+            "unit_price": 149.90,
+            "quantity": 2
+          }
+        ]
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc0ODkzODQ3fQ.2oB-O-Wy3rqkQhmcKIhHmt8WO1eSyIVGN0BCX4_Hbrk
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

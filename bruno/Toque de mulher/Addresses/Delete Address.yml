@@ -1,0 +1,17 @@
+info:
+  name: Delete Address
+  type: http
+  seq: 4
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/addresses/edae151e-6123-48c8-b6b7-f4d261b90dad"
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc0ODkzODQ3fQ.2oB-O-Wy3rqkQhmcKIhHmt8WO1eSyIVGN0BCX4_Hbrk
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
