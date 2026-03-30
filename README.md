@@ -4,25 +4,49 @@ Backend em `FastAPI`/`SQLModel` do projeto Toque de Mulher.
 
 ## Escopo atual do código versionado
 
-No snapshot atual deste repositório, o backend expõe principalmente o módulo de produtos:
+# 📁 Arquitetura do Projeto
 
-- criação de produtos
-- upload de imagens de produtos
-- modelos centrais de banco com `SQLModel`
-- configuração por variáveis de ambiente
+Este projeto foi desenvolvido com **FastAPI** e segue uma organização modular para facilitar a manutenção, escalabilidade e separação de responsabilidades.
 
-Atualmente a aplicação monta a rota de produtos em `app/main.py`.
+A estrutura foi pensada para dividir claramente:
+- rotas da API;
+- configurações centrais;
+- integração com banco de dados PostgreSQL;
+- models e schemas;
+- serviços de negócio.
 
-## Estrutura principal
+---
 
-- `app/main.py`: inicialização da API, CORS, pasta estática e registro das rotas
-- `app/core/settings.py`: leitura das variáveis de ambiente
-- `app/core/db.py`: engine, modelos centrais e criação de tabelas
-- `app/core/time.py`: helper para timestamps UTC com timezone
-- `app/features/products/router.py`: endpoints de produto e upload
-- `app/features/products/service.py`: slug, upload e regras auxiliares
-- `app/features/products/models.py`: modelos de produto e relacionamentos
-- `app/features/products/schemas.py`: payloads e validações de entrada
+## Estrutura de Pastas
+
+```bash
+app/
+├── api/
+│   ├── v1/endpoints/
+│   │   ├── addressRouter.py      # Rotas relacionadas aos endereços do usuário
+│   │   ├── login.py              # Rotas de autenticação e login
+│   │   ├── router.py             # Roteador principal de agrupamento das rotas
+│   │   ├── stripeCheckout.py     # Rotas de integração com Stripe Checkout
+│   │   ├── user.py               # Rotas relacionadas aos usuários
+│   │   └── weebhook.py           # Webhook para eventos externos (ex: Stripe)
+│   └── dependencies.py           # Dependências reutilizáveis da API (auth, sessão, helpers)
+│
+├── core/
+│   ├── db.py                     # Integração com PostgreSQL e gerenciamento da conexão/sessão
+│   ├── settings.py               # Configurações globais e variáveis de ambiente
+│   └── time.py                   # Funções utilitárias relacionadas a data e hora
+│
+├── models/                       # Modelos do banco de dados
+├── schemas/                      # Schemas de validação e serialização
+├── services/                     # Regras de negócio e integrações externas
+├── main.py                       # Ponto de entrada da aplicação FastAPI
+│
+static/                           # Arquivos estáticos, se necessário
+.gitignore                        # Arquivos e pastas ignorados pelo Git
+README copy.md                    # Cópia/rascunho de documentação
+README.md                         # Documentação principal do projeto
+database.py                       # Arquivo auxiliar relacionado ao banco de dados
+requirements.txt                  # Dependências do projeto
 
 ## Configuração local
 
@@ -42,15 +66,18 @@ uvicorn app.main:app --reload
 
 As variáveis atualmente documentadas em `toquedemulher-backend/.env.example` são:
 
-- `DATABASE_URL`: conexão do banco
-- `SQL_ECHO`: habilita logs SQL
-- `CORS_ORIGINS`: origens permitidas separadas por vírgula
+- `SECRET_KEY`: chave secreta usada para autenticação, assinatura de tokens e proteção de dados sensíveis da aplicação
+- `FRONTEND_SUCCESS_URL`: URL do front-end para onde o usuário será redirecionado após um pagamento aprovado
+- `FRONTEND_PENDING_URL`: URL do front-end para onde o usuário será redirecionado quando o pagamento ficar pendente
+- `FRONTEND_FAILURE_URL`: URL do front-end para onde o usuário será redirecionado quando o pagamento falhar ou for cancelado
 - `SUPABASE_URL`: URL do projeto Supabase
-- `SUPABASE_SERVICE_ROLE_KEY`: chave de serviço do Supabase
-- `SUPABASE_BUCKET`: bucket de imagens
-- `SUPABASE_FOLDER`: pasta base dos uploads
-- `SUPABASE_TIMEOUT`: timeout de upload
-- `PRODUCT_IMAGE_MAX_BYTES`: tamanho máximo permitido para upload
+- `SUPABASE_SERVICE_ROLE_KEY`: chave de serviço do Supabase com permissões elevadas para operações no storage
+- `SUPABASE_BUCKET`: nome do bucket do Supabase usado para armazenar imagens dos produtos
+- `SUPABASE_FOLDER`: pasta base dentro do bucket onde os uploads dos produtos serão organizados
+- `SUPABASE_TIMEOUT`: tempo limite, em segundos, para operações de upload no Supabase
+- `PRODUCT_IMAGE_MAX_BYTES`: tamanho máximo permitido, em bytes, para upload de imagens de produtos
+- `STRIPE_SECRET_KEY`: chave secreta da Stripe usada para criar sessões de pagamento e realizar operações seguras no backend
+- `STRIPE_WEBHOOK_SECRET`: segredo usado para validar a autenticidade dos eventos enviados pela Stripe via webhook
 
 ## O que já foi feito
 
