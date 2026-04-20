@@ -23,7 +23,6 @@ class LoginAndJWT():
     def verify_password(password, password_in_db):
         return pwd_context.verify(password, password_in_db)
 
-
     def hashing_password(password: str) -> str:
         return pwd_context.hash(password)
 

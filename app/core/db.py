@@ -12,6 +12,9 @@ from app.models.payment import Payment
 from app.models.paymentItem import PaymentItem
 from app.models.order import Order
 from app.models.orderItem import OrderItem
+from app.models.stock_batch import StockBatch
+from app.models.supplier_product import SupplierProduct
+
 from fastapi import Depends
 
 

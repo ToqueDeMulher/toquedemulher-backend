@@ -14,7 +14,7 @@ from app.models.address import Address
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 @router.post("/checkout", response_model=CheckoutResponse)
-def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: CurrentUser ): #Checkout é literalmente a tela de pagamento
+def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: CurrentUser): #Checkout é literalmente a tela de pagamento
      
     if not payload.items:
         raise HTTPException(status_code=400, detail="Nenhum item enviado para checkout")
