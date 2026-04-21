@@ -19,6 +19,6 @@ def add_to_stock(supplier: SupplierRequest, session: _SessionDep, user: CurrentU
 
     new_supplier = Supplier(**supplier.model_dump())
     
-    addToDB(new_supplier)
+    addToDB(new_supplier, session)
 
-    return Message("Fornecedor criado com sucesso")
+    return Message(message="Fornecedor criado com sucesso")

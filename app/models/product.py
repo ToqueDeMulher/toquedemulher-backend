@@ -4,7 +4,6 @@ from datetime import datetime
 from sqlalchemy import CheckConstraint
 from sqlmodel import SQLModel, Field, Relationship
 from app.core.time import utc_now
-from app.models.supplier import Supplier
 from app.models.brand import Brand
 from app.models.description import Description
 from app.models.category import Category
@@ -18,6 +17,7 @@ class Product(SQLModel, table=True):
     )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    supplier_id: Optional[int] = Field(default=None, foreign_key="supplier.id", index=True)
 
     slug: str = Field(index=True, unique=True)
     name: str
@@ -67,3 +67,4 @@ class Product(SQLModel, table=True):
     reviews: List["ProductReview"] = Relationship(back_populates="product") #type: ignore
     cart_items: List["CartItem"] = Relationship(back_populates="product") #type: ignore
     order_items: List["OrderItem"] = Relationship(back_populates="product") #type: ignore
+    supplier: Optional["Supplier"] = Relationship(back_populates="products") #type: ignore

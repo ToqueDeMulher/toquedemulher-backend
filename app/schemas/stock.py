@@ -1,11 +1,14 @@
 from typing import Optional
 from datetime import date
 from pydantic import BaseModel, Field
+from typing import List
 
-
-class StockRequest(BaseModel):
-    quantity: int = Field(ge=0)
-    # string tipo "YYYY-MM-DD" ou null -> Pydantic converte pra date
+class stockItemRequest(BaseModel):
+    product_name: str
+    quantity: int = Field(gt=0)
+    unit_cost: float = Field(gt=0)
     expiry_date: Optional[date] = None
 
-    
+class StockRequest(BaseModel):
+    supplier_name: str
+    items: List[stockItemRequest] = Field(min_length=1)

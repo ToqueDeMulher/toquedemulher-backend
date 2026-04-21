@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/user/login"
+  url: http://127.0.0.1:8000/user/login
   body:
     type: json
     data: |-
