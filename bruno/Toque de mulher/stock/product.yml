@@ -12,25 +12,21 @@ http:
       {
         "slug": "perfume-chanel-bleu-100ml",
         "name": "Perfume Chanel Bleu 100ml",
-        "price": 499.90,
+        "price": 499.9,
         "active": true,
         "volume": "100ml",
-
         "target_audience": "Masculino",
         "product_type": "Perfume",
         "fragrance": "Amadeirado",
-        "spf": null,
-
         "vegan": false,
         "cruelty_free": true,
         "hypoallergenic": false,
-
         "brand_id": 1,
         "description_id": 1
       }
   auth:
     type: bearer
-    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc2NzMxMzM5fQ.KNWav_H46zCWz8Lsb7Ymm1IyMI0nroJaONVw7vKcE3s
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc2Nzc3NzYyfQ.oe0XrgvhYw_4T-edFZSESNGXVFIo0SBmvGQm_9A2dfQ
 
 settings:
   encodeUrl: true

@@ -6,7 +6,23 @@ info:
 http:
   method: POST
   url: http://127.0.0.1:8000/stock/
-  auth: inherit
+  body:
+    type: json
+    data: |-
+      {
+        "supplier_name": "Distribuidora Premium",
+        "items": [
+          {
+            "product_name": "Perfume Chanel Bleu 100ml",
+            "quantity": 10,
+            "unit_cost": 320.50,
+            "expiry_date": "2026-12-31"
+          }
+        ]
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc2Nzc3NzYyfQ.oe0XrgvhYw_4T-edFZSESNGXVFIo0SBmvGQm_9A2dfQ
 
 settings:
   encodeUrl: true

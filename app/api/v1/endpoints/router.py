@@ -14,6 +14,8 @@ from app.models.productImage import ProductImage
 from app.schemas.create_products import (CreateProductRequest,CreateProductResponse,)
 from app.schemas.product_images import ProductImageResponse
 from app.services.service import generate_unique_slug, upload_to_supabase
+from app.api.dependencies import _SessionDep
+from app.schemas.products import ProductRequest
 
 
 router = APIRouter(
@@ -30,138 +32,38 @@ ALLOWED_IMAGE_TYPES = {
 
 @router.post("", response_model=CreateProductResponse)
 def create_product(
-    payload: CreateProductRequest,
-    session: Session = Depends(Database.get_session),
+    payload: ProductRequest,
+    session: _SessionDep
 ):
     try:
-        # 1) SUPPLIER (busca ou cria)
-        supplier = session.exec(
-            select(Supplier).where(Supplier.name == payload.supplier.name)
+        # 🔎 verifica slug duplicado
+        existing = session.exec(
+            select(Product).where(Product.slug == payload.slug)
         ).first()
 
-        if not supplier:
-            supplier = Supplier(
-                name=payload.supplier.name,
-                contact=payload.supplier.contact,
-                email=payload.supplier.email,
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail="Slug já existe"
             )
-            session.add(supplier)
-            session.flush()
 
-        # 2) BRAND (busca ou cria)
-        brand = session.exec(
-            select(Brand).where(Brand.name == payload.brand.name)
-        ).first()
+        # 🧱 cria produto
+        product = Product(**payload.model_dump())
 
-        if not brand:
-            brand = Brand(name=payload.brand.name)
-            session.add(brand)
-            session.flush()
-
-        # 3) DESCRIPTION (busca ou cria)
-        description = session.exec(
-            select(Description).where(Description.text == payload.description.text)
-        ).first()
-
-        if not description:
-            description = Description(
-                text=payload.description.text,
-                usage_tips=payload.description.usage_tips,
-                ingredients=payload.description.ingredients,
-            )
-            session.add(description)
-            session.flush()
-
-        # 4) CATEGORIES (busca ou cria)
-        category_objs: List[Category] = []
-
-        for category_data in payload.categories:
-            category = session.exec(
-                select(Category).where(Category.name == category_data.name)
-            ).first()
-
-            if not category:
-                category = Category(name=category_data.name)
-                session.add(category)
-                session.flush()
-
-            category_objs.append(category)
-
-        # 5) PRODUCT
-        product_data = payload.product
-        slug = generate_unique_slug(session, product_data.name)
-
-        product = Product(
-            slug=slug,
-            name=product_data.name,
-            price=product_data.price,
-            active=product_data.active,
-            volume=product_data.volume,
-            target_audience=product_data.target_audience,
-            product_type=product_data.product_type,
-            skin_type=product_data.skin_type,
-            hair_type=product_data.hair_type,
-            color=product_data.color,
-            fragrance=product_data.fragrance,
-            spf=product_data.spf,
-            vegan=product_data.vegan,
-            cruelty_free=product_data.cruelty_free,
-            hypoallergenic=product_data.hypoallergenic,
-            supplier_id=supplier.id,
-            brand_id=brand.id,
-            description_id=description.id,
-        )
         session.add(product)
-        session.flush()
-
-        # 6) vincula categorias
-        for category in category_objs:
-            if category not in product.categories:
-                product.categories.append(category)
-
-        # 7) STOCK
-        stock_data = payload.stock
-        stock = Stock(
-            product_id=product.id,
-            quantity=stock_data.quantity,
-            expiry_date=stock_data.expiry_date,
-            last_quantity=stock_data.quantity,
-        )
-        session.add(stock)
-
-        # 8) IMAGES
-        for image_data in payload.images:
-            image = ProductImage(
-                product_id=product.id,
-                url=image_data.url,
-                order=image_data.order,
-                alt_text=image_data.alt_text,
-            )
-            session.add(image)
-
-        # 9) COMMIT
         session.commit()
         session.refresh(product)
 
-        return CreateProductResponse(
-            id=product.id,
-            slug=product.slug,
-            name=product.name,
-            supplier_id=supplier.id,
-            brand_id=brand.id,
-            description_id=description.id,
-        )
+        return product
 
-    except HTTPException:
-        raise
-    except Exception as exc:
+    except Exception as e:
         session.rollback()
-        print("Erro ao criar produto:", repr(exc))
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro interno: {exc}",
-        ) from exc
+        print("Erro ao criar produto:", repr(e))
 
+    raise HTTPException(
+        status_code=500,
+        detail="Erro interno ao criar produto"
+    )
 
 @router.post(
     "/{product_id}/images/upload",

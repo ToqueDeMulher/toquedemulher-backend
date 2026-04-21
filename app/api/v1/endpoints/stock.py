@@ -33,12 +33,13 @@ def add_to_stock(user: CurrentUser, stock_info: StockRequest, session: _SessionD
                 stock = Stock(
                     product_id = product.id, 
                     total_quantity= item.quantity)
-                
+                s
                 session.add(stock)
                 session.flush() 
-             
+            else:
+                stock.total_quantity += item.quantity
+
             stock.updated_at = utc_now()
-            stock.total_quantity += item.quantity
 
             batch = StockBatch(
                 product_id= product.id,
@@ -51,7 +52,7 @@ def add_to_stock(user: CurrentUser, stock_info: StockRequest, session: _SessionD
             session.add(batch)
         
         session.commit()
-        return Message(message="Estoque atualizado") 
+        return Message(mensagem="Estoque atualizado") 
     
     except HTTPException:
         raise

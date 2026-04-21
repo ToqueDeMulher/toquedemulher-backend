@@ -21,4 +21,4 @@ def add_to_stock(supplier: SupplierRequest, session: _SessionDep, user: CurrentU
     
     addToDB(new_supplier, session)
 
-    return Message(message="Fornecedor criado com sucesso")
+    return Message(mensagem="Fornecedor criado com sucesso")
