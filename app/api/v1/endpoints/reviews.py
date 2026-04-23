@@ -141,7 +141,11 @@ async def upload_review_image(
     if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato inválido.")
 
-    upload_dir = os.path.join(settings.UPLOAD_DIR, "reviews", str(review_id))
+    reviews_root = os.path.realpath(os.path.join(settings.UPLOAD_DIR, "reviews"))
+	upload_dir = os.path.realpath(os.path.join(reviews_root, str(review_id)))
+	if os.path.commonpath([reviews_root, upload_dir]) != reviews_root:
+	    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Diretório de upload inválido.")
+        
     os.makedirs(upload_dir, exist_ok=True)
 
     ext = file.filename.split(".")[-1]

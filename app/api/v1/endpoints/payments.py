@@ -77,5 +77,7 @@ async def mercadopago_webhook(request: Request, db: Session = Depends(get_db)):
         return {"status": "processed"}
 
     except Exception as e:
-        logger.error(f"Erro ao processar webhook: {e}")
-        return {"status": "error", "detail": str(e)}
+        logger.exception("Erro ao processar webhook")
+        return {"status": "error", "detail": "Internal server error"}
+
+    
