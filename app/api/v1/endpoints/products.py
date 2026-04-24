@@ -220,10 +220,11 @@ async def upload_product_image(
     if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato inválido.")
 
-    base_upload_dir = os.path.realpath(os.path.join(settings.UPLOAD_DIR, "products"))
-	upload_dir = os.path.realpath(os.path.join(base_upload_dir, str(product_id)))
-	if os.path.commonpath([base_upload_dir, upload_dir]) != base_upload_dir:
-	    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Caminho de upload inválido.")
+    base_upload_dir = os.path.realpath(os.path.abspath(os.path.join(settings.UPLOAD_DIR, "products")))
+    product_segment = str(int(product_id))
+    upload_dir = os.path.realpath(os.path.abspath(os.path.join(base_upload_dir, product_segment)))
+    if os.path.commonpath([base_upload_dir, upload_dir]) != base_upload_dir:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Caminho de upload inválido.")
 
     os.makedirs(upload_dir, exist_ok=True)
 
