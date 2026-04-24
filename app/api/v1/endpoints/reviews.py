@@ -145,9 +145,10 @@ async def upload_review_image(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato inválido.")
 
     reviews_root = os.path.realpath(os.path.join(settings.UPLOAD_DIR, "reviews"))
-	upload_dir = os.path.realpath(os.path.join(reviews_root, str(review_id)))
-	if os.path.commonpath([reviews_root, upload_dir]) != reviews_root:
-	    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Diretório de upload inválido.")
+    safe_review_segment = str(int(review_id))
+    upload_dir = os.path.realpath(os.path.join(reviews_root, safe_review_segment))
+    if os.path.commonpath([reviews_root, upload_dir]) != reviews_root:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Diretório de upload inválido.")
 
     os.makedirs(upload_dir, exist_ok=True)
 
