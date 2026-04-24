@@ -214,6 +214,9 @@ async def upload_product_image(
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado.")
 
+    if product_id <= 0:
+	    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de produto inválido.")
+    
     if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato inválido.")
 
@@ -224,8 +227,18 @@ async def upload_product_image(
 
     os.makedirs(upload_dir, exist_ok=True)
 
-    ext = file.filename.split(".")[-1]
-    filename = f"{uuid.uuid4()}.{ext}"
+    original_name = os.path.basename(file.filename or "")
+    _, ext = os.path.splitext(original_name)
+    ext = ext.lower()
+
+    allowed_exts = {".jpg", ".jpeg", ".png", ".webp"}
+    if ext not in allowed_exts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Extensão de arquivo inválida."
+        )
+
+    filename = f"{uuid.uuid4()}{ext}"
     
     file_path = os.path.abspath(os.path.join(upload_dir, filename))
 	if os.path.commonpath([base_upload_dir, file_path]) != base_upload_dir:

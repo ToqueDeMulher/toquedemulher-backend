@@ -132,6 +132,9 @@ async def upload_review_image(
     current_user: User = Depends(get_current_active_user),
 ):
     """Adiciona uma imagem a uma avaliação."""
+
+    if review_id <= 0:
+	    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de avaliação inválido.")
     review = db.query(Review).filter(
         Review.id == review_id, Review.user_id == current_user.id
     ).first()
@@ -145,12 +148,31 @@ async def upload_review_image(
 	upload_dir = os.path.realpath(os.path.join(reviews_root, str(review_id)))
 	if os.path.commonpath([reviews_root, upload_dir]) != reviews_root:
 	    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Diretório de upload inválido.")
-        
+
     os.makedirs(upload_dir, exist_ok=True)
 
-    ext = file.filename.split(".")[-1]
-    filename = f"{uuid.uuid4()}.{ext}"
-    file_path = os.path.join(upload_dir, filename)
+    original_name = os.path.basename(file.filename or "")
+    
+    # 1. Extrai a extensão usando o original_name que você criou
+    _, ext = os.path.splitext(original_name)
+    
+    # 2. Converte para minúsculo para evitar problemas com ".JPG" ou ".PNG"
+    ext = ext.lower() 
+
+    allowed_exts = {".jpg", ".jpeg", ".png", ".webp"}
+    if ext not in allowed_exts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Extensão de arquivo inválida."
+        )
+
+    filename = f"{uuid.uuid4()}{ext}"
+    file_path = os.path.realpath(os.path.join(upload_dir, filename))
+    if os.path.commonpath([upload_dir, file_path]) != upload_dir:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Caminho de arquivo inválido."
+        )
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
