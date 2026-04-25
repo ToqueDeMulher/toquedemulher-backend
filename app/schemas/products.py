@@ -1,9 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, Field
-
+from app.schemas.supplier_product import SupplierProductRequest
+from typing import List
 
 class ProductRequest(BaseModel):
     slug: str
@@ -26,8 +25,7 @@ class ProductRequest(BaseModel):
 
     brand_id: Optional[int] = None
     description_id: Optional[int] = None
-
-
+    supplier_products: Optional[List[SupplierProductRequest]] = []
 
 class ProductResponse(BaseModel):
     id: UUID

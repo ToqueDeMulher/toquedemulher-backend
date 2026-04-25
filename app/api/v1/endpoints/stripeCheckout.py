@@ -9,6 +9,8 @@ from app.api.dependencies import CurrentUser
 from app.models.paymentItem import PaymentItem
 from sqlmodel import select
 from app.models.address import Address
+from app.models.product import Product
+from app.models.stock import Stock
 
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -16,8 +18,35 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 @router.post("/checkout", response_model=CheckoutResponse)
 def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: CurrentUser): #Checkout é literalmente a tela de pagamento
      
-    if not payload.items:
-        raise HTTPException(status_code=400, detail="Nenhum item enviado para checkout")
+    # Verificação de produto e estoque
+
+    total_amount = Decimal("0")
+
+    with session.begin():
+        for item in payload.items:
+
+            product = session.exec(select(Product).where(Product.slug == item.slug)).first()
+
+            if not product:
+                raise HTTPException(status_code=404, detail=f"Produto '{item.slug}' não encontrado")
+
+            # 🔒 trava o estoque (EVITA concorrência)
+            stock = session.exec(select(Stock).where(Stock.product_id == product.id)
+                .with_for_update()
+            ).first()
+
+            if not stock:
+                raise HTTPException(status_code=400, detail=f"Produto '{product.name}' sem estoque cadastrado")
+
+            if stock.total_quantity < item.quantity:
+                raise HTTPException(status_code=400, detail=f"Estoque insuficiente para '{product.name}'"
+                )
+
+            total_amount += product.price * item.quantity
+
+            stock.total_quantity -= item.quantity
+    
+    
     
     address = session.exec(
         select(Address).where(
@@ -30,11 +59,6 @@ def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: 
         raise HTTPException(404, detail="Endereço não encontrado ou não pertence ao usuário" )
 
     order_id = uuid4()
-
-    total_amount = sum(
-        Decimal(str(item.unit_price)) * item.quantity
-        for item in payload.items
-    )
 
     try:
         stripe_session = create_checkout_session(payload, order_id)

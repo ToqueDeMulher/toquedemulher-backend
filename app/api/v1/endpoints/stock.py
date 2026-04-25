@@ -33,7 +33,6 @@ def add_to_stock(user: CurrentUser, stock_info: StockRequest, session: _SessionD
                 stock = Stock(
                     product_id = product.id, 
                     total_quantity= item.quantity)
-                s
                 session.add(stock)
                 session.flush() 
             else:

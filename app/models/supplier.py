@@ -14,4 +14,3 @@ class Supplier(SQLModel, table=True):
 
     batches: List["StockBatch"] = Relationship(back_populates="supplier") #type: ignore
     supplier_products: List["SupplierProduct"] = Relationship(back_populates="supplier") #type: ignore
-    products: list["Product"] = Relationship(back_populates="supplier") #type: ignore

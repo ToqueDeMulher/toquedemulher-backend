@@ -1,21 +1,17 @@
 from __future__ import annotations
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlmodel import Session, select
 from app.core.db import Database
-from app.models.stock import Stock
-from app.models.category import Category
 from app.models.product import Product
-from app.models.supplier import Supplier
-from app.models.brand import Brand
-from app.models.description import Description
 from app.models.productImage import ProductImage
-from app.schemas.create_products import (CreateProductRequest,CreateProductResponse,)
+from app.schemas.create_products import CreateProductResponse
 from app.schemas.product_images import ProductImageResponse
-from app.services.service import generate_unique_slug, upload_to_supabase
+from app.services.service import upload_to_supabase
 from app.api.dependencies import _SessionDep
 from app.schemas.products import ProductRequest
+from app.services.supplierProductService import upsert_supplier_products
 
 
 router = APIRouter(
@@ -42,28 +38,41 @@ def create_product(
         ).first()
 
         if existing:
-            raise HTTPException(
-                status_code=400,
-                detail="Slug já existe"
-            )
+            raise HTTPException(400, "Slug já existe")
 
         # 🧱 cria produto
-        product = Product(**payload.model_dump())
+        product_data = payload.model_dump(exclude={"supplier_products"})
+        product = Product(**product_data)
 
         session.add(product)
+        session.flush()
+
+        # 🔥 trata lista de fornecedores
+        if payload.supplier_products:
+            upsert_supplier_products(
+                data_list=payload.supplier_products,
+                product_id=product.id,
+                session=session
+            )
+
         session.commit()
         session.refresh(product)
 
         return product
 
+    except ValueError as e:
+        session.rollback()
+        raise HTTPException(400, str(e))
+
+    except HTTPException:
+        raise
+
     except Exception as e:
         session.rollback()
         print("Erro ao criar produto:", repr(e))
+        raise HTTPException(500, "Erro interno ao criar produto")
 
-    raise HTTPException(
-        status_code=500,
-        detail="Erro interno ao criar produto"
-    )
+
 
 @router.post(
     "/{product_id}/images/upload",

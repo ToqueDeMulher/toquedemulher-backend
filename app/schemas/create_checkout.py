@@ -1,18 +1,19 @@
-from decimal import Decimal
 from pydantic import BaseModel
 from uuid import UUID
 from typing import List
+from pydantic import Field
 
-class CheckoutProductRequest(BaseModel):
+
+class Products(BaseModel):
     id: UUID
     name: str
     product_url: str
-    unit_price: Decimal
-    quantity: int
+    quantity: int = Field(gt=0)
+    slug: str
 
 class CreateCheckoutRequest(BaseModel): 
     address_id: UUID
-    items: List[CheckoutProductRequest]
+    items: List[Products]
 
 class CheckoutResponse(BaseModel):
     client_secret: str
