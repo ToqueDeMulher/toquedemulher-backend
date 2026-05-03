@@ -26,7 +26,7 @@ ALLOWED_IMAGE_TYPES = {
 }
 
 
-@router.post("", response_model=CreateProductResponse)
+@router.post("")
 def create_product(
     payload: ProductRequest,
     session: _SessionDep
@@ -40,14 +40,14 @@ def create_product(
         if existing:
             raise HTTPException(400, "Slug já existe")
 
-        # 🧱 cria produto
+        # cria produto
         product_data = payload.model_dump(exclude={"supplier_products"})
         product = Product(**product_data)
 
         session.add(product)
         session.flush()
 
-        # 🔥 trata lista de fornecedores
+        # trata lista de fornecedores
         if payload.supplier_products:
             upsert_supplier_products(
                 data_list=payload.supplier_products,
@@ -58,7 +58,7 @@ def create_product(
         session.commit()
         session.refresh(product)
 
-        return product
+        return f"Produto {product.name} criado com sucesso"
 
     except ValueError as e:
         session.rollback()

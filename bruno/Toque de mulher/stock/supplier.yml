@@ -5,8 +5,18 @@ info:
 
 http:
   method: POST
-  url: http://127.0.0.1:8000/supplier/
-  auth: inherit
+  url: "{{baseUrl}}/supplier/"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Importadora Luxo",
+        "contact": "(61) 98888-2222",
+        "email": "luxo@importadora.com"
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc3ODQxNzk4fQ.01sh57Js7vUyqGsxcEM7aNMQpCgjgYzz0WdGnvp_GpQ
 
 settings:
   encodeUrl: true
