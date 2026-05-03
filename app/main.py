@@ -14,6 +14,8 @@ from app.api.v1.endpoints.login import router as login
 from app.api.v1.endpoints.addressRouter import router as address
 from app.api.v1.endpoints.supplier import router as supplier
 from app.api.v1.endpoints.stock import router as stock
+from app.api.v1.endpoints.supplierProduct import router as supplierProduct
+
 
 
 
@@ -49,3 +51,4 @@ app.include_router(login)
 app.include_router(address)
 app.include_router(stock)
 app.include_router(supplier)
+app.include_router(supplierProduct)

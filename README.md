@@ -282,6 +282,360 @@ backend/
     address/
     payment/
 
+
+---
+
+## 📦 Fluxo de cadastro de produtos, fornecedores e estoque
+
+Esta parte do sistema organiza o fluxo administrativo para cadastrar produtos, fornecedores, vincular fornecedores aos produtos e registrar entradas reais no estoque. Os testes dessas rotas estão organizados no **Bruno**, dentro da coleção do projeto, usando a variável `{{baseUrl}}`.
+
+### Ordem recomendada do fluxo
+
+```text
+1. Supplier
+   Cadastra quem fornece os produtos.
+
+2. Product
+   Cadastra o que será vendido na loja.
+
+3. SupplierProduct
+   Informa quais fornecedores vendem quais produtos, com preço de custo e prazo.
+
+4. Stock
+   Registra a entrada real no estoque e cria as levas/lotes.
+```
+
+Essa ordem evita erros como fornecedor inexistente, produto inexistente e inconsistência no estoque.
+
+---
+
+### 1. Criar fornecedor
+
+**Rota:** `POST /supplier`
+
+Cria um fornecedor que poderá ser associado a produtos e utilizado nas entradas de estoque.
+
+#### Exemplo de requisição
+
+```json
+{
+  "name": "Distribuidora Alpha",
+  "contact": "(61) 99999-1111",
+  "email": "alpha@distribuidora.com"
+}
+```
+
+#### Campos recebidos
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `name` | string | Sim | Nome do fornecedor |
+| `contact` | string | Não | Telefone ou contato do fornecedor |
+| `email` | string | Não | E-mail válido do fornecedor |
+
+#### Retorno esperado
+
+```json
+{
+  "mensagem": "Fornecedor criado com sucesso"
+}
+```
+
+#### Erros comuns
+
+| Status | Motivo |
+|---|---|
+| 400 | Já existe fornecedor com esse e-mail |
+| 422 | E-mail inválido ou JSON fora do schema |
+
+---
+
+### 2. Criar produto
+
+**Rota:** `POST /products`
+
+Cria um produto que será vendido na loja. A rota também pode receber uma lista de `supplier_products`, permitindo cadastrar junto quais fornecedores vendem esse produto.
+
+#### Exemplo de requisição
+
+```json
+{
+  "slug": "protetor-solar-loreal-50fps-120ml",
+  "name": "Protetor Solar L'Oréal 50FPS 120ml",
+  "price": 69.90,
+  "active": true,
+  "volume": "120ml",
+  "target_audience": "Unissex",
+  "product_type": "Protetor Solar",
+  "skin_type": "Todos os tipos",
+  "vegan": false,
+  "cruelty_free": true,
+  "hypoallergenic": true,
+  "spf": 50,
+  "brand_id": null,
+  "description_id": null,
+  "supplier_products": [
+    {
+      "supplier_name": "Distribuidora Premium",
+      "supplier_price": 35.00,
+      "lead_time_days": 2
+    },
+    {
+      "supplier_name": "Importadora Luxo",
+      "supplier_price": 33.50,
+      "lead_time_days": 4
+    }
+  ]
+}
+```
+
+#### Campos principais recebidos
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `slug` | string | Sim | Identificador público único do produto, usado em URLs |
+| `name` | string | Sim | Nome do produto |
+| `price` | number | Sim | Preço de venda do produto |
+| `active` | boolean | Não | Define se o produto está ativo |
+| `volume` | string | Não | Volume ou tamanho do produto |
+| `target_audience` | string | Não | Público-alvo do produto |
+| `product_type` | string | Não | Tipo do produto |
+| `skin_type` | string | Não | Tipo de pele, quando aplicável |
+| `hair_type` | string | Não | Tipo de cabelo, quando aplicável |
+| `fragrance` | string | Não | Fragrância do produto |
+| `spf` | int | Não | Fator de proteção solar |
+| `vegan` | boolean | Não | Indica se é vegano |
+| `cruelty_free` | boolean | Não | Indica se é cruelty free |
+| `hypoallergenic` | boolean | Não | Indica se é hipoalergênico |
+| `brand_id` | int/null | Não | ID da marca, se existir |
+| `description_id` | int/null | Não | ID da descrição, se existir |
+| `supplier_products` | array | Não | Lista de fornecedores que vendem o produto |
+
+#### Campos de `supplier_products`
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `supplier_name` | string | Sim | Nome do fornecedor já cadastrado |
+| `supplier_price` | number | Sim | Preço de custo do fornecedor |
+| `lead_time_days` | int/null | Não | Prazo médio de entrega em dias |
+
+#### Retorno esperado
+
+Dependendo do schema atual da rota, o retorno pode ser uma mensagem ou um objeto do produto criado. O recomendado para o frontend é retornar o produto criado, por exemplo:
+
+```json
+{
+  "id": "uuid-do-produto",
+  "slug": "protetor-solar-loreal-50fps-120ml",
+  "name": "Protetor Solar L'Oréal 50FPS 120ml",
+  "price": 69.90
+}
+```
+
+#### Erros comuns
+
+| Status | Motivo |
+|---|---|
+| 400 | Slug já existe |
+| 400 | Fornecedor informado em `supplier_products` não existe |
+| 422 | JSON inválido ou campo obrigatório ausente |
+
+---
+
+### 3. Associar fornecedor a vários produtos
+
+**Rota:** `POST /suppliersProducts`
+
+Associa um fornecedor já cadastrado a uma lista de produtos já cadastrados. Essa rota representa o catálogo do fornecedor, ou seja, quais produtos ele vende, por qual preço e com qual prazo.
+
+#### Exemplo de requisição
+
+```json
+{
+  "supplier_name": "Distribuidora Alpha",
+  "products_list": [
+    {
+      "product_name": "Perfume Versace Eros 100ml",
+      "supplier_price": 79.90,
+      "lead_time_days": 7
+    },
+    {
+      "product_name": "Perfume Dior Sauvage 100ml",
+      "supplier_price": 45.50,
+      "lead_time_days": 5
+    },
+    {
+      "product_name": "Creme Hidratante Nivea 200ml",
+      "supplier_price": 19.90,
+      "lead_time_days": 3
+    }
+  ]
+}
+```
+
+#### Campos recebidos
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `supplier_name` | string | Sim | Nome do fornecedor já cadastrado |
+| `products_list` | array | Sim | Lista de produtos que o fornecedor vende |
+
+#### Campos de `products_list`
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `product_name` | string | Sim | Nome exato do produto já cadastrado |
+| `supplier_price` | number | Sim | Preço de custo do fornecedor para aquele produto |
+| `lead_time_days` | int/null | Não | Prazo médio de entrega em dias |
+
+#### Retorno esperado
+
+```json
+{
+  "message": "Fornecedor associado aos produtos com sucesso",
+  "products_updated": [
+    "Perfume Versace Eros 100ml",
+    "Perfume Dior Sauvage 100ml",
+    "Creme Hidratante Nivea 200ml"
+  ]
+}
+```
+
+#### Erros comuns
+
+| Status | Motivo |
+|---|---|
+| 400 | Fornecedor não encontrado |
+| 400 | Produto não encontrado |
+| 422 | JSON inválido ou campo obrigatório ausente |
+
+---
+
+### 4. Adicionar entrada no estoque
+
+**Rota:** `POST /stock/`
+
+Registra uma entrada real de mercadoria no estoque. Cada item enviado cria uma leva/lote em `stock_batch` e atualiza o total disponível em `stock`.
+
+#### Exemplo de requisição
+
+```json
+{
+  "supplier_name": "Distribuidora Premium",
+  "items": [
+    {
+      "product_name": "Perfume Dior Sauvage 100ml",
+      "quantity": 10,
+      "unit_cost": 320.50,
+      "expiry_date": "2027-12-31"
+    },
+    {
+      "product_name": "Perfume Versace Eros 100ml",
+      "quantity": 8,
+      "unit_cost": 295.00,
+      "expiry_date": "2027-10-15"
+    },
+    {
+      "product_name": "Produto Simples",
+      "quantity": 20,
+      "unit_cost": 25.00,
+      "expiry_date": "2028-01-01"
+    }
+  ]
+}
+```
+
+#### Campos recebidos
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `supplier_name` | string | Sim | Nome do fornecedor que entregou os produtos |
+| `items` | array | Sim | Lista de produtos que entraram no estoque |
+
+#### Campos de `items`
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `product_name` | string | Sim | Nome exato do produto cadastrado |
+| `quantity` | int | Sim | Quantidade adicionada ao estoque |
+| `unit_cost` | number | Sim | Custo unitário da leva/lote |
+| `expiry_date` | date/null | Não | Data de validade no formato `YYYY-MM-DD` |
+
+#### Retorno esperado
+
+```json
+{
+  "mensagem": "Estoque atualizado"
+}
+```
+
+#### Erros comuns
+
+| Status | Motivo |
+|---|---|
+| 400 | Fornecedor não existente |
+| 400 | Produto não existente |
+| 422 | JSON inválido, quantidade inválida ou data inválida |
+
+---
+
+## 🧪 Organização dos testes no Bruno
+
+No Bruno, a coleção deve deixar o fluxo claro para o time de frontend e backend. A organização recomendada é:
+
+```text
+bruno/
+  stock/
+    01 - supplier.bru
+    02 - product.bru
+    03 - suppliersProducts.bru
+    04 - stock.bru
+```
+
+A ordem dos testes deve seguir o fluxo:
+
+```text
+POST /supplier
+POST /products
+POST /suppliersProducts
+POST /stock/
+```
+
+### Variáveis recomendadas no ambiente local do Bruno
+
+```text
+baseUrl=http://127.0.0.1:8000
+token=
+```
+
+Use `{{baseUrl}}` nas requisições para evitar URLs fixas, por exemplo:
+
+```text
+{{baseUrl}}/products
+{{baseUrl}}/suppliersProducts
+{{baseUrl}}/stock/
+```
+
+---
+
+## 🧠 Diferença entre SupplierProduct, StockBatch e Stock
+
+| Entidade | Papel |
+|---|---|
+| `Supplier` | Cadastra quem fornece produtos |
+| `Product` | Cadastra o que será vendido na loja |
+| `SupplierProduct` | Informa quais fornecedores vendem quais produtos, com preço e prazo |
+| `StockBatch` | Registra uma entrada real de mercadoria, ou seja, uma leva/lote |
+| `Stock` | Guarda o total disponível de cada produto |
+
+Resumo:
+
+```text
+SupplierProduct = catálogo/possibilidade de compra
+StockBatch = compra real/entrada no estoque
+Stock = total disponível
+```
+
 ## 🧱 Base do sistema já pronta
 
 Com base na estrutura atual, o projeto já possui:

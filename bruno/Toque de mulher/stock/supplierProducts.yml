@@ -1,0 +1,40 @@
+info:
+  name: supplierProducts
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: http://127.0.0.1:8000/suppliersProducts
+  body:
+    type: json
+    data: |-
+      {
+        "supplier_name": "Distribuidora Alpha",
+        "products_list": [
+          {
+            "product_name": "Perfume Versace Eros 100ml",
+            "supplier_price": 79.9,
+            "lead_time_days": 7
+          },
+          {
+            "product_name": "Perfume Dior Sauvage 100ml",
+            "supplier_price": 45.5,
+            "lead_time_days": 5
+          },
+          {
+            "product_name": "Creme Hidratante Nivea 200ml",
+            "supplier_price": 19.9,
+            "lead_time_days": 3
+          }
+        ]
+      }
+  auth:
+    type: bearer
+    token: ""
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

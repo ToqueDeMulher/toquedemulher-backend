@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException
 from sqlmodel import select
+
 from app.models.product import Product
 from app.schemas.create_products import CreateProductResponse
 from app.api.dependencies import _SessionDep
-from app.schemas.supplier_product import SupplierAndProductRequest
+from app.schemas.supplier_product import SupplierAndProductRequest, SupplierProductRequest
 from app.services.supplierProductService import upsert_supplier_products
 
 
@@ -12,44 +14,48 @@ router = APIRouter(
     prefix="/suppliersProducts"
 )
 
-@router.post("", response_model=CreateProductResponse)
+
+@router.post("")
 def create_product(payload: SupplierAndProductRequest, session: _SessionDep):
-    # Associa fornecedores a produtos em lote
     try:
         updated_products = []
 
-        for product_name in payload.products_list:
-
-            product = session.exec(
-                select(Product).where(Product.name == product_name)).first()
+        for item in payload.products_list:
+            product = session.exec(select(Product).where(Product.name == item.product_name)).first()
 
             if not product:
-                raise HTTPException(status_code=400, detail=f"Produto '{product_name}' não encontrado")
+                raise HTTPException(status_code=400,detail=f"Produto '{item.product_name}' não encontrado")
+
+            supplier_product_data = SupplierProductRequest(
+                supplier_name=payload.supplier_name,
+                supplier_price=item.supplier_price,
+                lead_time_days=item.lead_time_days
+            )
 
             upsert_supplier_products(
-                data_list=payload.supplier,
+                data_list=[supplier_product_data],
                 product_id=product.id,
                 session=session
-            )
+                )
 
             updated_products.append(product.name)
 
         session.commit()
 
         return {
-            "message": "Fornecedores associados com sucesso",
+            "message": f"Fornecedor {payload.supplier_name} associado aos produtos com sucesso",
             "products_updated": updated_products
         }
 
-
     except ValueError as e:
         session.rollback()
-        raise HTTPException(400, str(e))
+        raise HTTPException(status_code=400, detail=str(e))
 
     except HTTPException:
+        session.rollback()
         raise
 
     except Exception as e:
         session.rollback()
-        print("Erro ao criar produto:", repr(e))
-        raise HTTPException(500, "Erro interno ao criar produto")
+        print("Erro ao associar fornecedor aos produtos:", repr(e))
+        raise HTTPException(status_code=500,detail="Erro interno ao associar fornecedor aos produtos")

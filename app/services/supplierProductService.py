@@ -8,11 +8,9 @@ from app.api.dependencies import _SessionDep
 
 from typing import List
 
-def upsert_supplier_products(
-    data_list: List[SupplierProductRequest],
-    product_id: UUID,
-    session: _SessionDep
-):
+# Cria um Supplier_product, caso não exista, e adicina ao BD
+def upsert_supplier_products(data_list: List[SupplierProductRequest], product_id: UUID, session: _SessionDep):
+
     for data in data_list:
 
         supplier = session.exec(
