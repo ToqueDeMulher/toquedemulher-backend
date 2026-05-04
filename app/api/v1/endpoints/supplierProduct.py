@@ -1,22 +1,19 @@
 from __future__ import annotations
-
 from fastapi import APIRouter, HTTPException
 from sqlmodel import select
-
 from app.models.product import Product
-from app.schemas.create_products import CreateProductResponse
-from app.api.dependencies import _SessionDep
+from app.api.dependencies import _SessionDep, AdminUser
 from app.schemas.supplier_product import SupplierAndProductRequest, SupplierProductRequest
 from app.services.supplierProductService import upsert_supplier_products
 
 
-router = APIRouter(
-    prefix="/suppliersProducts"
-)
+router = APIRouter(prefix="/suppliersProducts")
 
 
 @router.post("")
-def create_product(payload: SupplierAndProductRequest, session: _SessionDep):
+def create_product(payload: SupplierAndProductRequest, session: _SessionDep, user: AdminUser):
+    # Associa 1 forecedor a vários produtos
+    
     try:
         updated_products = []
 

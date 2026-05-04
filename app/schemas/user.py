@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
-
 from pydantic import BaseModel, EmailStr
+
 class GetUserResponse(BaseModel):
     name: Optional[str] = None
     cpf: Optional[str] = None

@@ -7,15 +7,14 @@ from app.models.stock import Stock
 from app.schemas.message import Message
 from sqlmodel import select
 from app.core.db import _SessionDep
-from app.api.dependencies import CurrentUser, addToDB
-from uuid import uuid4
+from app.api.dependencies import AdminUser
 from app.core.time import utc_now
 
 router = APIRouter(prefix="/stock")
 
 @router.post("/", status_code=200)
-def add_to_stock(user: CurrentUser, stock_info: StockRequest, session: _SessionDep ):
-
+def add_to_stock(user: AdminUser, stock_info: StockRequest, session: _SessionDep ):
+    
     try:
         supplier = session.exec(select(Supplier).where(Supplier.name == stock_info.supplier_name)).first()
         if not supplier:

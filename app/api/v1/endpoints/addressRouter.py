@@ -11,11 +11,7 @@ from uuid import UUID
 router = APIRouter(prefix="/addresses")
 
 @router.post("/", response_model=Message, status_code=201)
-def create_address(
-    address_data: AddressRequest,
-    session: _SessionDep,
-    user: CurrentUser
-):
+def create_address(address_data: AddressRequest, session: _SessionDep, user: CurrentUser):
     
     try:
         new_address = Address(

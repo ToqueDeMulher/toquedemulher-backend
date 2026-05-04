@@ -6,10 +6,9 @@ from sqlmodel import Session, select
 from app.core.db import Database
 from app.models.product import Product
 from app.models.productImage import ProductImage
-from app.schemas.create_products import CreateProductResponse
 from app.schemas.product_images import ProductImageResponse
 from app.services.service import upload_to_supabase
-from app.api.dependencies import _SessionDep
+from app.api.dependencies import _SessionDep, AdminUser
 from app.schemas.products import ProductRequest
 from app.services.supplierProductService import upsert_supplier_products
 
@@ -27,10 +26,7 @@ ALLOWED_IMAGE_TYPES = {
 
 
 @router.post("")
-def create_product(
-    payload: ProductRequest,
-    session: _SessionDep
-):
+def create_product(payload: ProductRequest,session: _SessionDep, user: AdminUser):
     try:
         # 🔎 verifica slug duplicado
         existing = session.exec(
