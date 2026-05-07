@@ -10,7 +10,7 @@ from app.core.db import _SessionDep
 from app.api.dependencies import AdminUser
 from app.core.time import utc_now
 from typing import List
-
+from app.services.stockService import get_product_by_slug, get_stock_by_product_id, change_stock_quantity
 
 
 router = APIRouter(prefix="/stock")
@@ -88,15 +88,9 @@ def get_stock(session: _SessionDep, user: AdminUser)-> List[GetStock]:
 def delete_stock(slug: str, user: AdminUser, session: _SessionDep):
 
     # Deleta o stock e as levas de um produto, portanto precisa de uma mensagem de confirmação de ação no front-end antes de enviar esse request.
-    product = session.exec(select(Product).where(Product.slug == slug)).first()
+    product = get_product_by_slug(slug, session)
 
-    if not product:
-        raise HTTPException(status_code=404,detail="Produto não encontrado")
-
-    stock = session.exec(select(Stock).where(Stock.product_id == product.id)).first()
-
-    if not stock:
-        raise HTTPException(status_code=404,detail="Produto fora de estoque")
+    stock = get_stock_by_product_id(product.id, session)
 
     batches = session.exec(select(StockBatch).where(StockBatch.stock_id == stock.id)).all()
 
@@ -112,15 +106,9 @@ def delete_stock(slug: str, user: AdminUser, session: _SessionDep):
 def delete_stock(slug: str, user: AdminUser, session: _SessionDep):
 
     # Deleta o stock e as levas de um produto, portanto precisa de uma mensagem de confirmação de ação no front-end antes de enviar esse request.
-    product = session.exec(select(Product).where(Product.slug == slug)).first()
+    product = get_product_by_slug(slug, session)
 
-    if not product:
-        raise HTTPException(status_code=404,detail="Produto não encontrado")
-
-    stock = session.exec(select(Stock).where(Stock.product_id == product.id)).first()
-
-    if not stock:
-        raise HTTPException(status_code=404,detail="Produto fora de estoque")
+    stock = get_stock_by_product_id(product.id, session)
 
     batches = session.exec(select(StockBatch).where(StockBatch.stock_id == stock.id)).all()
 
@@ -135,22 +123,15 @@ def delete_stock(slug: str, user: AdminUser, session: _SessionDep):
 @router.put("/")
 def change_stock(quantity: int, slug: str, user: AdminUser, session: _SessionDep):
 
-    product = session.exec(select(Product).where(Product.slug == slug)).first()
+    # Rota para casos especiais, como a venda fora da loja online ou vencimento de lote
+    stock = change_stock_quantity(
+        slug=slug,
+        quantity=quantity,
+        session=session
+    )
 
-    if not product: 
-        raise HTTPException(status_code=404,detail="Produto não encontrado")
+    product = get_product_by_slug(slug=slug, session=session)
 
-    stock = session.exec(select(Stock).where(Stock.product_id == product.id)).first()
-
-    if not stock:
-        raise HTTPException(status_code=404,detail="Produto fora de estoque")
-
-    if quantity < 0:
-        raise HTTPException(status_code=400,detail="A quantidade não pode ser negativa")
-
-    stock.total_quantity = quantity
-
-    session.add(stock)
     session.commit()
     session.refresh(stock)
 
