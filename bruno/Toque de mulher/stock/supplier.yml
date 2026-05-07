@@ -5,18 +5,18 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/supplier/"
+  url: http://127.0.0.1:8000/supplier/
   body:
     type: json
     data: |-
       {
-        "name": "Importadora Luxo",
+        "name": "Importadora dwwads",
         "contact": "(61) 98888-2222",
-        "email": "luxo@importadora.com"
+        "email": "luxoss@importadora.com"
       }
   auth:
     type: bearer
-    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc3ODQxNzk4fQ.01sh57Js7vUyqGsxcEM7aNMQpCgjgYzz0WdGnvp_GpQ
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc3ODUzMzMzfQ.7GmUdTHI2GjKdy9kY5A24lIUilLuzen45vRUjiPjjno
 
 settings:
   encodeUrl: true
