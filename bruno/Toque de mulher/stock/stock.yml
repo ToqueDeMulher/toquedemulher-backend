@@ -5,36 +5,24 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/stock/"
+  url: http://127.0.0.1:8000/stock/
   body:
     type: json
     data: |-
       {
-        "supplier_name": "Distribuidora Premium",
+        "supplier_name": "Distribuidora Alpha",
         "items": [
-          {
-            "product_name": "Perfume Dior Sauvage 100ml",
-            "quantity": 10,
-            "unit_cost": 320.50,
-            "expiry_date": "2027-12-31"
-          },
-          {
-            "product_name": "Perfume Versace Eros 100ml",
-            "quantity": 8,
-            "unit_cost": 295.00,
-            "expiry_date": "2027-10-15"
-          },
           {
             "product_name": "Produto Simples",
             "quantity": 20,
-            "unit_cost": 25.00,
-            "expiry_date": "2028-01-01"
+            "unit_cost": 25.5,
+            "expiry_date": "2026-12-31"
           }
         ]
       }
   auth:
     type: bearer
-    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc3ODQxNzk4fQ.01sh57Js7vUyqGsxcEM7aNMQpCgjgYzz0WdGnvp_GpQ
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc4MTk3MDM2fQ.xr7KVbz4lAwtgzkrxqwPp-CcRTTd69Bb6lvJJtTcYmA
 
 settings:
   encodeUrl: true

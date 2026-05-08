@@ -1,18 +1,18 @@
 info:
   name: delete stock
   type: http
-  seq: 6
+  seq: 3
 
 http:
   method: DELETE
-  url: http://127.0.0.1:8000/stock/?name=Perfume%20Dior%20Sauvage%20100ml
+  url: http://127.0.0.1:8000/stock/?slug=perfume-versace-eros-100ml
   params:
-    - name: name
-      value: Perfume%20Dior%20Sauvage%20100ml
+    - name: slug
+      value: perfume-versace-eros-100ml
       type: query
   auth:
     type: bearer
-    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc4MTg1NDU2fQ.dmXkVyFO85xq_y0eP1Y4-qpJJgRBBINrCw3v_-SZHrM
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc4MTg2Mzg2fQ.LCJrUmdjNWbAWlHsHKpTvu66hWGGeIN4GWYypKOhwAA
 
 settings:
   encodeUrl: true
