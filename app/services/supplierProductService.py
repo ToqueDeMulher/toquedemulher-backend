@@ -5,6 +5,7 @@ from app.models.supplier_product import SupplierProduct
 from sqlmodel import select
 from app.schemas.supplier_product import SupplierProductRequest
 from app.api.dependencies import _SessionDep
+from app.services.supplierService import SupplierService
 
 from typing import List
 
@@ -13,12 +14,7 @@ def upsert_supplier_products(data_list: List[SupplierProductRequest], product_id
 
     for data in data_list:
 
-        supplier = session.exec(
-            select(Supplier).where(Supplier.name == data.supplier_name)
-        ).first()
-
-        if not supplier:
-            raise ValueError(f"Fornecedor '{data.supplier_name}' não existe")
+        supplier = SupplierService.find_supplier_by_name(session, data.supplier_name)
 
         relation = session.exec(
             select(SupplierProduct).where(

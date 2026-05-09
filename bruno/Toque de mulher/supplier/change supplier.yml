@@ -1,18 +1,17 @@
 info:
-  name: supplier
+  name: change supplier
   type: http
-  seq: 2
+  seq: 5
 
 http:
-  method: POST
+  method: PUT
   url: http://127.0.0.1:8000/supplier/
   body:
     type: json
     data: |-
       {
-        "name": "Distribuidora Beta",
-        "contact": "61999998888",
-        "email": "beta@email.com"
+        "supplier_name": "Distribuidora Beta",
+        "contact": "61977776666"
       }
   auth:
     type: bearer
