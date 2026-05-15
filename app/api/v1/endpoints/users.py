@@ -1,24 +1,36 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.orm import Session
+import os
+import uuid
+import shutil
 from typing import List
-from app.db.base import get_db
-from app.models.user import User, Address
-from app.schemas.user import (
-    UserOut, UserUpdate, UserChangePassword, UserOutAdmin,
-    AddressCreate, AddressUpdate, AddressOut
-)
-from app.core.security import verify_password, get_password_hash
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from sqlalchemy.orm import Session
+
 from app.api.v1.deps import get_current_active_user, get_current_admin
-import os, uuid, shutil
 from app.core.config import settings
+from app.core.security import get_password_hash, verify_password
+from app.db.base import get_db
+from app.models.user import Address, User
+from app.schemas.user import (
+    AddressCreate,
+    AddressOut,
+    AddressUpdate,
+    UserChangePassword,
+    UserOut,
+    UserOutAdmin,
+    UserUpdate,
+)
 
 router = APIRouter(prefix="/users", tags=["Usuários"])
+
+_ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+_ALLOWED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 # ─── Perfil do Usuário Logado ────────────────────────────────────────────────
 
 @router.get("/me", response_model=UserOut)
-def get_my_profile(current_user: User = Depends(get_current_active_user)):
+def get_my_profile(current_user: User = Depends(get_current_active_user)) -> User:
     """Retorna os dados do usuário autenticado."""
     return current_user
 
@@ -28,7 +40,7 @@ def update_my_profile(
     user_update: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-):
+) -> User:
     """Atualiza os dados do usuário autenticado."""
     for field, value in user_update.model_dump(exclude_unset=True).items():
         setattr(current_user, field, value)
@@ -42,7 +54,7 @@ def change_password(
     password_data: UserChangePassword,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-):
+) -> dict:
     """Altera a senha do usuário autenticado."""
     if not verify_password(password_data.current_password, current_user.hashed_password):
         raise HTTPException(
@@ -59,19 +71,31 @@ async def upload_avatar(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-):
+) -> User:
     """Faz upload do avatar do usuário."""
-    if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:
+    # Valida tipo MIME
+    if file.content_type not in _ALLOWED_IMAGE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Formato de imagem inválido. Use JPEG, PNG ou WebP.",
         )
 
+    # CORREÇÃO: extensão extraída com segurança via os.path.splitext,
+    # não com split(".")[-1] que permite nomes como "shell.php.jpg" passarem silenciosamente
+    original_name = os.path.basename(file.filename or "")
+    _, ext = os.path.splitext(original_name)
+    ext = ext.lower()
+
+    if ext not in _ALLOWED_IMAGE_EXTS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Extensão de arquivo inválida.",
+        )
+
     upload_dir = os.path.join(settings.UPLOAD_DIR, "avatars")
     os.makedirs(upload_dir, exist_ok=True)
 
-    ext = file.filename.split(".")[-1]
-    filename = f"{uuid.uuid4()}.{ext}"
+    filename = f"{uuid.uuid4()}{ext}"
     file_path = os.path.join(upload_dir, filename)
 
     with open(file_path, "wb") as buffer:
@@ -86,7 +110,7 @@ async def upload_avatar(
 # ─── Endereços ───────────────────────────────────────────────────────────────
 
 @router.get("/me/addresses", response_model=List[AddressOut])
-def list_addresses(current_user: User = Depends(get_current_active_user)):
+def list_addresses(current_user: User = Depends(get_current_active_user)) -> list:
     """Lista os endereços do usuário autenticado."""
     return current_user.addresses
 
@@ -96,13 +120,10 @@ def create_address(
     address_in: AddressCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-):
+) -> Address:
     """Adiciona um novo endereço ao usuário."""
     if address_in.is_default:
-        # Remover padrão dos outros endereços
-        db.query(Address).filter(Address.user_id == current_user.id).update(
-            {"is_default": False}
-        )
+        db.query(Address).filter(Address.user_id == current_user.id).update({"is_default": False})
 
     address = Address(user_id=current_user.id, **address_in.model_dump())
     db.add(address)
@@ -117,7 +138,7 @@ def update_address(
     address_update: AddressUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-):
+) -> Address:
     """Atualiza um endereço do usuário."""
     address = db.query(Address).filter(
         Address.id == address_id, Address.user_id == current_user.id
@@ -126,9 +147,7 @@ def update_address(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endereço não encontrado.")
 
     if address_update.is_default:
-        db.query(Address).filter(Address.user_id == current_user.id).update(
-            {"is_default": False}
-        )
+        db.query(Address).filter(Address.user_id == current_user.id).update({"is_default": False})
 
     for field, value in address_update.model_dump(exclude_unset=True).items():
         setattr(address, field, value)
@@ -142,7 +161,7 @@ def delete_address(
     address_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-):
+) -> None:
     """Remove um endereço do usuário."""
     address = db.query(Address).filter(
         Address.id == address_id, Address.user_id == current_user.id
@@ -161,7 +180,7 @@ def list_users(
     limit: int = 50,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
-):
+) -> list:
     """[Admin] Lista todos os usuários."""
     return db.query(User).offset(skip).limit(limit).all()
 
@@ -171,7 +190,7 @@ def toggle_user_active(
     user_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
-):
+) -> User:
     """[Admin] Ativa ou desativa um usuário."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
