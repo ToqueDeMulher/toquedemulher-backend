@@ -12,6 +12,7 @@ class GetUserResponse(BaseModel):
     accepts_marketing: Optional[bool] = None
 
 class UserRequest(BaseModel):
+    name: str
     email: EmailStr
     password: str
 

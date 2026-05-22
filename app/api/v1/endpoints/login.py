@@ -5,7 +5,7 @@ from sqlmodel import select
 from app.services.loginService import LoginAndJWT
 from app.core.db import _SessionDep
 
-router = APIRouter(prefix="/user")
+router = APIRouter(prefix="/api/v1/user")
 
 @router.post("/login", status_code=200)
 def isLoged(loginCredentiasl: Login, session: _SessionDep)-> Token:

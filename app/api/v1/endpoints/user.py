@@ -14,7 +14,7 @@ from app.core.db import _SessionDep
 from app.api.dependencies import CurrentUser, addToDB
 from app.schemas.message import Message
 
-router = APIRouter(prefix="/user")
+router = APIRouter(prefix="/api/v1/user")
 
 @router.post("/register", status_code=201) #201 = created
 def create_user(user: UserRequest, session: _SessionDep):
@@ -26,8 +26,9 @@ def create_user(user: UserRequest, session: _SessionDep):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     db_user = UserInDB(
-        **user.model_dump(exclude={"password"}), #** pega um dicionário e espalha ele como argumentos nomeados.
-        hashed_password= LoginAndJWT.hashing_password(user.password),  
+        name=user.name,
+        email=user.email,
+        hashed_password=LoginAndJWT.hashing_password(user.password),
     )
 
     addToDB(db_user, session)
