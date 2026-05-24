@@ -1,97 +1,69 @@
-from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Float,
-    ForeignKey, Text, Enum, JSON
-)
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-import enum
-from app.db.base import Base
+from typing import List, Optional
+from uuid import UUID, uuid4
+from datetime import datetime
+from sqlalchemy import CheckConstraint
+from sqlmodel import SQLModel, Field, Relationship
+from app.core.time import utc_now
+from app.models.brand import Brand
+from app.models.description import Description
+from app.models.category import Category
+from app.models.categoryProductLink import CategoryProductLink
 
+class Product(SQLModel, table=True):
+    __tablename__ = "product"
+    __table_args__ = (
+        CheckConstraint("price >= 0", name="ck_product_price_non_negative"),
+    )
 
-class ProductStatus(str, enum.Enum):
-    active = "active"
-    inactive = "inactive"
-    out_of_stock = "out_of_stock"
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
 
+    slug: str = Field(index=True, unique=True)
+    name: str = Field(index=True, unique=True)
+    price: float
+    active: bool = Field(default=True)
 
-class Category(Base):
-    __tablename__ = "categories"
+    volume: Optional[str] = None
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    slug = Column(String(120), unique=True, index=True, nullable=False)
-    description = Column(Text, nullable=True)
-    image_url = Column(String(500), nullable=True)
-    parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # atributos
+    target_audience: Optional[str] = None
+    product_type: Optional[str] = None
+    skin_type: Optional[str] = None
+    hair_type: Optional[str] = None
+    color: Optional[str] = None
+    fragrance: Optional[str] = None
+    spf: Optional[int] = None
 
-    # Relacionamentos
-    parent = relationship("Category", remote_side=[id], backref="subcategories")
-    products = relationship("Product", back_populates="category")
+    vegan: bool = Field(default=False)
+    cruelty_free: bool = Field(default=False)
+    hypoallergenic: bool = Field(default=False)
 
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
-class Product(Base):
-    __tablename__ = "products"
+    # 🔗 RELAÇÕES CORRETAS
 
-    id = Column(Integer, primary_key=True, index=True)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
-    name = Column(String(200), nullable=False)
-    slug = Column(String(220), unique=True, index=True, nullable=False)
-    description = Column(Text, nullable=True)
-    short_description = Column(String(500), nullable=True)
-    sku = Column(String(100), unique=True, index=True, nullable=True)
-    brand = Column(String(100), nullable=True)
-    price = Column(Float, nullable=False)
-    compare_at_price = Column(Float, nullable=True)  # Preço "de" para promoções
-    cost_price = Column(Float, nullable=True)
-    stock_quantity = Column(Integer, default=0)
-    weight = Column(Float, nullable=True)  # em gramas
-    status = Column(Enum(ProductStatus), default=ProductStatus.active)
-    is_featured = Column(Boolean, default=False)
-    tags = Column(JSON, nullable=True)  # ["perfume", "floral", "feminino"]
-    attributes = Column(JSON, nullable=True)  # {"volume": "50ml", "concentração": "EDP"}
-    average_rating = Column(Float, default=0.0)
-    review_count = Column(Integer, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    brand_id: Optional[int] = Field(default=None, foreign_key="brand.id", index=True)
+    description_id: Optional[int] = Field(default=None, foreign_key="description.id", index=True)
 
-    # Relacionamentos
-    category = relationship("Category", back_populates="products")
-    images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
-    variants = relationship("ProductVariant", back_populates="product", cascade="all, delete-orphan")
-    reviews = relationship("Review", back_populates="product")
-    cart_items = relationship("CartItem", back_populates="product")
-    order_items = relationship("OrderItem", back_populates="product")
+    brand: Optional["Brand"] = Relationship(back_populates="products")
+    description: Optional["Description"] = Relationship(back_populates="products")
 
+    categories: List["Category"] = Relationship(
+        back_populates="products",
+        link_model=CategoryProductLink
+    )
 
-class ProductImage(Base):
-    __tablename__ = "product_images"
+    # 📦 ESTOQUE
+    stock: Optional["Stock"] = Relationship(back_populates="product") #type: ignore
+    batches: List["StockBatch"] = Relationship(back_populates="product") #type: ignore
 
-    id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
-    url = Column(String(500), nullable=False)
-    alt_text = Column(String(200), nullable=True)
-    is_primary = Column(Boolean, default=False)
-    sort_order = Column(Integer, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # 🤝 FORNECEDORES (N:N)
+    supplier_products: List["SupplierProduct"] = Relationship(back_populates="product") #type: ignore
 
-    # Relacionamentos
-    product = relationship("Product", back_populates="images")
-
-
-class ProductVariant(Base):
-    __tablename__ = "product_variants"
-
-    id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
-    name = Column(String(100), nullable=False)  # Ex: "50ml", "100ml"
-    sku = Column(String(100), unique=True, nullable=True)
-    price = Column(Float, nullable=True)  # Se nulo, usa o preço do produto pai
-    stock_quantity = Column(Integer, default=0)
-    attributes = Column(JSON, nullable=True)  # {"volume": "50ml"}
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relacionamentos
-    product = relationship("Product", back_populates="variants")
+    # 🛒 OUTROS
+    images: List["ProductImage"] = Relationship(back_populates="product") #type: ignore
+    reviews: List["ProductReview"] = Relationship(back_populates="product") #type: ignore
+    cart_items: List["CartItem"] = Relationship(back_populates="product") #type: ignore
+    order_items: List["OrderItem"] = Relationship(back_populates="product") #type: ignore
+    payment_items: List["PaymentItem"] = Relationship(back_populates="product") #type: ignore
+    

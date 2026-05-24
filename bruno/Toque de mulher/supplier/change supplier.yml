@@ -1,0 +1,24 @@
+info:
+  name: change supplier
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: http://127.0.0.1:8000/supplier/
+  body:
+    type: json
+    data: |-
+      {
+        "supplier_name": "Distribuidora Beta",
+        "contact": "61977776666"
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc4MzMzOTc1fQ.QDDC5ACAdBKeBZoDwHMtseua7x7JqOxbkqegmhFj6RA
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,47 +1,20 @@
-from sqlalchemy import Column, Integer, Float, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.db.base import Base
+from typing import List, Optional
+from uuid import UUID, uuid4
+from datetime import datetime
+from sqlmodel import SQLModel, Field, Relationship
+from app.core.time import utc_now
 
 
-class Cart(Base):
-    __tablename__ = "carts"
+class Cart(SQLModel, table=True):
+    __tablename__ = "cart"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    user_id: UUID = Field(foreign_key="user.id", index=True)
 
-    # Relacionamentos
-    user = relationship("User", back_populates="cart")
-    items = relationship("CartItem", back_populates="cart", cascade="all, delete-orphan")
+    status: str = Field(default="ativo")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
-    @property
-    def total(self) -> float:
-        return sum(item.subtotal for item in self.items)
-
-    @property
-    def item_count(self) -> int:
-        return sum(item.quantity for item in self.items)
-
-
-class CartItem(Base):
-    __tablename__ = "cart_items"
-
-    id = Column(Integer, primary_key=True, index=True)
-    cart_id = Column(Integer, ForeignKey("carts.id", ondelete="CASCADE"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
-    variant_id = Column(Integer, ForeignKey("product_variants.id", ondelete="SET NULL"), nullable=True)
-    quantity = Column(Integer, default=1, nullable=False)
-    unit_price = Column(Float, nullable=False)  # Preço no momento da adição
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # Relacionamentos
-    cart = relationship("Cart", back_populates="items")
-    product = relationship("Product", back_populates="cart_items")
-    variant = relationship("ProductVariant")
-
-    @property
-    def subtotal(self) -> float:
-        return self.unit_price * self.quantity
+    user: Optional["UserInDB"] = Relationship(back_populates="carts")   #type: ignore
+    items: List["CartItem"] = Relationship(back_populates="cart")       #type: ignore
+    order: Optional["Order"] = Relationship(back_populates="cart")      #type: ignore

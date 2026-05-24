@@ -1,0 +1,28 @@
+info:
+  name: Change Address
+  type: http
+  seq: 3
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/addresses/668e387e-4e91-4cb2-947a-75bee5773e90"
+  body:
+    type: json
+    data: |-
+      {
+        "street": "Avenida das Flores",
+        "number": "450",
+        "complement": "Bloco C, Apto 304",
+        "neighborhood": "Centro",
+        "city": "Brasília",
+        "is_default_shipping": true
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc0ODkzODQ3fQ.2oB-O-Wy3rqkQhmcKIhHmt8WO1eSyIVGN0BCX4_Hbrk
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

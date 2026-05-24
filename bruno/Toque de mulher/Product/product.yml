@@ -1,0 +1,52 @@
+info:
+  name: product
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/products"
+  body:
+    type: json
+    data: |-
+      {
+        "slug": "protetor-solar-loreal-50fps-120ml",
+        "name": "Protetor Solar L'Oréal 50FPS 120ml",
+        "price": 69.90,
+        "active": true,
+        "volume": "120ml",
+
+        "target_audience": "Unissex",
+        "product_type": "Protetor Solar",
+        "skin_type": "Todos os tipos",
+
+        "vegan": false,
+        "cruelty_free": true,
+        "hypoallergenic": true,
+        "spf": 50,
+
+        "brand_id": null,
+        "description_id": null,
+
+        "supplier_products": [
+          {
+            "supplier_name": "Distribuidora Premium",
+            "supplier_price": 35.00,
+            "lead_time_days": 2
+          },
+          {
+            "supplier_name": "Importadora Luxo",
+            "supplier_price": 33.50,
+            "lead_time_days": 4
+          }
+        ]
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc3ODQxNzk4fQ.01sh57Js7vUyqGsxcEM7aNMQpCgjgYzz0WdGnvp_GpQ
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

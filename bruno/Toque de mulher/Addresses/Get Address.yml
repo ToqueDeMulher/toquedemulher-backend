@@ -1,0 +1,17 @@
+info:
+  name: Get Address
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/addresses/"
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc0ODkzODQ3fQ.2oB-O-Wy3rqkQhmcKIhHmt8WO1eSyIVGN0BCX4_Hbrk
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,24 @@
+info:
+  name: change stock
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://127.0.0.1:8000/stock/?slug=produto-simples&quantity=40
+  params:
+    - name: slug
+      value: produto-simples
+      type: query
+    - name: quantity
+      value: "40"
+      type: query
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0ZTJAZW1haWwuY29tIiwiZXhwIjoxNzc4MTk3MDM2fQ.xr7KVbz4lAwtgzkrxqwPp-CcRTTd69Bb6lvJJtTcYmA
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,16 @@
+info:
+  name: Get User
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/user/me"
+  auth:
+    type: bearer
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

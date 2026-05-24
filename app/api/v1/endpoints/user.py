@@ -1,0 +1,130 @@
+from app.models.user import UserInDB
+from app.schemas.user import (
+    UserRequest,
+    ChangeUserInformationRequest,
+    ChangeEmailRequest,
+    ChangePasswordRequest,
+    GetUserResponse,
+    DeleteAccountRequest
+)
+from sqlmodel import select
+from fastapi import HTTPException, APIRouter
+from app.services.loginService import LoginAndJWT
+from app.core.db import _SessionDep
+from app.api.dependencies import CurrentUser, addToDB
+from app.schemas.message import Message
+
+router = APIRouter(prefix="/api/v1/user")
+
+@router.post("/register", status_code=201) #201 = created
+def create_user(user: UserRequest, session: _SessionDep):
+
+    query = select(UserInDB).where(UserInDB.email == user.email) #criando consulta
+    existing_user = session.exec(query).first()                  #executando consulta
+
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    db_user = UserInDB(
+        name=user.name,
+        email=user.email,
+        hashed_password=LoginAndJWT.hashing_password(user.password),
+    )
+
+    addToDB(db_user, session)
+    
+    print("Usuário para 'salvar' no banco de dados:", db_user)
+
+    return Message(mensagem="Usuario criado com sucesso")
+
+@router.get("/me", response_model=GetUserResponse)
+def getUser(session: _SessionDep, user: CurrentUser):
+    db_user = session.get(UserInDB, user.id)
+
+    if not db_user:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    return db_user
+
+@router.delete("/me")
+def deleteUser(data: DeleteAccountRequest, session: _SessionDep, user: CurrentUser):
+
+    db_user = session.get(UserInDB, user.id)
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    if not LoginAndJWT.verify_password(data.current_password, db_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Senha incorreta")
+    
+    if data.confirm_text.upper() != "DELETE":
+        raise HTTPException(status_code=400, detail="Confirmação inválida")
+    
+    session.delete(db_user)
+    session.commit()
+    
+    return Message(mensagem="Conta excluída com sucesso")
+
+    
+@router.put("/me")
+def changeUserInformation(userInformations: ChangeUserInformationRequest, session: _SessionDep, user: CurrentUser):
+    
+    db_user = session.exec(
+        select(UserInDB).where(UserInDB.id == user.id)
+    ).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    update_data = userInformations.model_dump(exclude_unset=True) ##model_dump retorna um dicionario
+    
+    for key, value in update_data.items():
+        setattr(db_user, key, value) #db_user.name = "name"
+    
+    addToDB(db_user, session)
+
+    return Message(mensagem= f"Usuário {db_user.name} atualizado com sucesso")
+
+
+@router.put("/me/email")
+def changeEmail(data: ChangeEmailRequest, session: _SessionDep, user: CurrentUser):
+    db_user = session.get(UserInDB, user.id)
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    if data.new_email == db_user.email:
+        raise HTTPException(status_code=400, detail="O novo email é igual ao email atual")
+
+    existing_user = session.exec(
+        select(UserInDB).where(UserInDB.email == data.new_email)
+    ).first()
+
+    if existing_user and existing_user.id != db_user.id:
+        raise HTTPException(status_code=400, detail="Email já está em uso")
+
+    db_user.email = data.new_email
+
+    addToDB(db_user, session)
+
+    return Message(mensagem="Email atualizado com sucesso")
+
+@router.put("/me/password")
+def changePassword(data: ChangePasswordRequest, user:CurrentUser, session: _SessionDep):
+    db_user = session.get(UserInDB, user.id)
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    password_is_correct = LoginAndJWT.verify_password(
+        data.current_password,
+        db_user.hashed_password
+    )
+
+    if not password_is_correct:
+        raise HTTPException(status_code=400, detail="Senha atual incorreta")
+
+    db_user.hashed_password = LoginAndJWT.hashing_password(data.new_password)
+
+    addToDB(db_user, session)
+
+    return Message(mensagem="Senha alterada com sucesso")

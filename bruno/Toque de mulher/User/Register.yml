@@ -1,0 +1,28 @@
+info:
+  name: Register
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/user/register"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "gu",
+        "email": "teste2@email.com",
+        "password": "123456"
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: baseUrl
+      value: http://127.0.0.1:8000
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

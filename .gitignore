@@ -1,4 +1,7 @@
 # Python
+.env.*
+!.env.example
+*.pyc
 __pycache__/
 *.py[cod]
 *.pyo
