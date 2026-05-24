@@ -16,20 +16,21 @@ from app.api.v1.endpoints.supplier import router as supplier
 from app.api.v1.endpoints.stock import router as stock
 from app.api.v1.endpoints.supplierProduct import router as supplierProduct
 
-
-
-
 app = FastAPI(title="Toque de Mulher API")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
-origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()]
+origins = [
+    origin.strip()
+    for origin in settings.CORS_ORIGINS.split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,          # ou ["*"] so pra testar
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

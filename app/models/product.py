@@ -9,7 +9,6 @@ from app.models.description import Description
 from app.models.category import Category
 from app.models.categoryProductLink import CategoryProductLink
 
-
 class Product(SQLModel, table=True):
     __tablename__ = "product"
     __table_args__ = (

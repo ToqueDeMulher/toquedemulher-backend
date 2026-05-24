@@ -1,5 +1,37 @@
-.env
+# Python
 .env.*
 !.env.example
-__pycache__/
 *.pyc
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+env/
+
+# Ambiente
+.env
+*.env
+
+# Banco de dados de teste
+test.db
+*.db
+
+# Uploads
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

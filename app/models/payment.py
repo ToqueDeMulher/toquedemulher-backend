@@ -6,9 +6,6 @@ from sqlalchemy import Column, DateTime, Numeric
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
  
-
-
-
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
