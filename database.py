@@ -1,46 +1,13 @@
-# Backward-compatibility imports
-from app.core.db import (
-    engine,
-    create_db_and_tables,
-    get_session,
-    UserRoleLink,
-    OrderCouponLink,
-    RoleInDB,
-    UserInDB,
-    Address,
-    Cart,
-    CartItem,
-    PaymentMethod,
-    Order,
-    OrderItem,
-    Payment,
-    Coupon,
-)
+from app.core.db import Database
+
+
+engine = Database.engine
+create_db_and_tables = Database.create_db_and_tables
+get_session = Database.get_session
 
 
 __all__ = [
     "engine",
     "create_db_and_tables",
     "get_session",
-    "UserRoleLink",
-    "OrderCouponLink",
-    "RoleInDB",
-    "UserInDB",
-    "Address",
-    "Cart",
-    "CartItem",
-    "PaymentMethod",
-    "Order",
-    "OrderItem",
-    "Payment",
-    "Coupon",
-    "CategoryProductLink",
-    "Category",
-    "Supplier",
-    "Brand",
-    "Description",
-    "Stock",
-    "Product",
-    "ProductReview",
-    "ProductImage",
 ]

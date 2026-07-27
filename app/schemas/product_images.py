@@ -9,5 +9,7 @@ class ProductImageRequest(BaseModel):
 class ProductImageResponse(BaseModel):
     id: int
     url: str
-    order: int = Field(ge=1)
     alt_text: Optional[str] = None
+    order: int = Field(ge=1)
+    sort_order: int = Field(ge=1)
+    is_primary: bool = False

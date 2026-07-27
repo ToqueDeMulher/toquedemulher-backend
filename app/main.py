@@ -17,6 +17,7 @@ from app.api.v1.endpoints.stock import router as stock
 from app.api.v1.endpoints.supplierProduct import router as supplierProduct
 
 app = FastAPI(title="Toque de Mulher API")
+API_V1_PREFIX = "/api/v1"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
@@ -44,12 +45,17 @@ def on_startup():
     Database.create_db_and_tables()
 
 
-app.include_router(product)
-app.include_router(payments_router)
-app.include_router(crateUser)
-app.include_router(weebhook)
-app.include_router(login)
-app.include_router(address)
-app.include_router(stock)
-app.include_router(supplier)
-app.include_router(supplierProduct)
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+
+app.include_router(product, prefix=API_V1_PREFIX)
+app.include_router(payments_router, prefix=API_V1_PREFIX)
+app.include_router(crateUser, prefix=API_V1_PREFIX)
+app.include_router(weebhook, prefix=API_V1_PREFIX)
+app.include_router(login, prefix=API_V1_PREFIX)
+app.include_router(address, prefix=API_V1_PREFIX)
+app.include_router(stock, prefix=API_V1_PREFIX)
+app.include_router(supplier, prefix=API_V1_PREFIX)
+app.include_router(supplierProduct, prefix=API_V1_PREFIX)

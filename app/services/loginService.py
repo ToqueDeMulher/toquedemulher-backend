@@ -16,7 +16,7 @@ from app.core.settings import settings
 ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  #"deprecated="auto"" fará com que senhas com hashes antigos sejam atualizadas automaticamente na próxima vez que o usuário fizer login.
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/user/login")
 
 class LoginAndJWT():
     
@@ -36,6 +36,18 @@ class LoginAndJWT():
         to_encode.update({"exp": expire})
 
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM) #"jwt.encode" Retorna um Token
+        return encoded_jwt
+
+    def create_refresh_token(data: dict, expires_delta: timedelta | None = None):
+        to_encode = data.copy()
+        if expires_delta:
+            expire = datetime.now(timezone.utc) + expires_delta
+        else:
+            expire = datetime.now(timezone.utc) + timedelta(days=7)
+
+        to_encode.update({"exp": expire, "type": "refresh"})
+
+        encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
 
     # PART 2

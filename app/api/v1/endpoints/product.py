@@ -1,15 +1,18 @@
 from __future__ import annotations
+
 from typing import Optional
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlmodel import Session, select
+
+from app.api.dependencies import AdminUser, _SessionDep
 from app.core.db import Database
 from app.models.product import Product
 from app.models.productImage import ProductImage
 from app.schemas.product_images import ProductImageResponse
-from app.services.service import upload_to_supabase
-from app.api.dependencies import _SessionDep, AdminUser
 from app.schemas.products import ProductRequest
+from app.services.service import generate_unique_slug, upload_to_supabase
 from app.services.supplierProductService import upsert_supplier_products
 
 
@@ -26,56 +29,69 @@ ALLOWED_IMAGE_TYPES = {
 
 
 @router.post("")
-def create_product(payload: ProductRequest,session: _SessionDep, user: AdminUser):
+def create_product(payload: ProductRequest, session: _SessionDep, user: AdminUser):
     try:
-        # 🔎 verifica slug duplicado
-        existing = session.exec(
-            select(Product).where(Product.slug == payload.slug)
-        ).first()
+        slug = payload.slug or generate_unique_slug(session, payload.name)
 
+        existing = session.exec(select(Product).where(Product.slug == slug)).first()
         if existing:
-            raise HTTPException(400, "Slug já existe")
+            raise HTTPException(status_code=400, detail="Slug ja existe")
 
-        # cria produto
-        product_data = payload.model_dump(exclude={"supplier_products"})
+        product_data = payload.model_dump(
+            exclude={"supplier_products"},
+            exclude_none=True,
+        )
+        product_data["slug"] = slug
+
         product = Product(**product_data)
-
         session.add(product)
         session.flush()
 
-        # trata lista de fornecedores
         if payload.supplier_products:
             upsert_supplier_products(
                 data_list=payload.supplier_products,
                 product_id=product.id,
-                session=session
+                session=session,
             )
 
         session.commit()
         session.refresh(product)
 
-        return f"Produto {product.name} criado com sucesso"
-
-    except ValueError as e:
+        return {
+            "message": f"Produto {product.name} criado com sucesso",
+            "id": str(product.id),
+            "slug": product.slug,
+            "name": product.name,
+        }
+    except ValueError as exc:
         session.rollback()
-        raise HTTPException(400, str(e))
-
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except HTTPException:
         raise
-
-    except Exception as e:
+    except Exception as exc:
         session.rollback()
-        print("Erro ao criar produto:", repr(e))
-        raise HTTPException(500, "Erro interno ao criar produto")
+        raise HTTPException(
+            status_code=500,
+            detail="Erro interno ao criar produto",
+        ) from exc
 
 
-
+@router.post(
+    "/{product_id}/images",
+    response_model=ProductImageResponse,
+    responses={
+        400: {"description": "Formato de imagem invalido."},
+        404: {"description": "Produto nao encontrado."},
+        413: {"description": "Arquivo maior que o limite configurado."},
+        500: {"description": "Falha ao persistir a imagem."},
+    },
+)
 @router.post(
     "/{product_id}/images/upload",
     response_model=ProductImageResponse,
     responses={
-        400: {"description": "Formato de imagem inválido."},
-        404: {"description": "Produto não encontrado."},
+        400: {"description": "Formato de imagem invalido."},
+        404: {"description": "Produto nao encontrado."},
         413: {"description": "Arquivo maior que o limite configurado."},
         500: {"description": "Falha ao persistir a imagem."},
     },
@@ -133,6 +149,8 @@ async def upload_product_image(
     return ProductImageResponse(
         id=image.id,
         url=image.url,
-        order=image.order,
         alt_text=image.alt_text,
+        order=image.order,
+        sort_order=image.order,
+        is_primary=False,
     )
