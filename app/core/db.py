@@ -21,7 +21,7 @@ from fastapi import Depends
 
 class Database:
 
-    engine = create_engine(settings.DATABASE_URL, echo=True) 
+    engine = create_engine(settings.database_url, **settings.db_engine_options)
 
     @staticmethod
     def create_db_and_tables():

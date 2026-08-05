@@ -242,8 +242,8 @@ async def upload_product_image(
     filename = f"{uuid.uuid4()}{ext}"
     
     file_path = os.path.realpath(os.path.join(upload_dir, filename))
-	if os.path.commonpath([base_upload_dir, file_path]) != base_upload_dir:
-	    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Caminho de arquivo inválido.")
+    if os.path.commonpath([base_upload_dir, file_path]) != base_upload_dir:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Caminho de arquivo inválido.")
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)

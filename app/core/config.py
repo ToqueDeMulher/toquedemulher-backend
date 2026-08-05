@@ -1,6 +1,12 @@
 from pydantic_settings import BaseSettings
 from typing import List
 
+from app.core.database_url import (
+    DEFAULT_SUPABASE_PROJECT_REF,
+    database_engine_options,
+    resolve_database_url,
+)
+
 
 class Settings(BaseSettings):
     # Aplicação
@@ -13,7 +19,19 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Banco de Dados
-    DATABASE_URL: str
+    DATABASE_URL: str = ""
+    SQL_ECHO: bool = False
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_RECYCLE: int = 1800
+    DB_POOL_MODE: str = "queue"
+    SUPABASE_PROJECT_REF: str = DEFAULT_SUPABASE_PROJECT_REF
+    SUPABASE_DB_PASSWORD: str = ""
+    SUPABASE_DB_USER: str = "postgres"
+    SUPABASE_DB_NAME: str = "postgres"
+    SUPABASE_DB_HOST: str = ""
+    SUPABASE_DB_PORT: int = 5432
+    SUPABASE_DB_SSLMODE: str = "require"
 
     # Redis
     REDIS_URL: str
@@ -52,6 +70,21 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def database_url(self) -> str:
+        return resolve_database_url(self)
+
+    @property
+    def db_engine_options(self) -> dict[str, object]:
+        return database_engine_options(
+            self.database_url,
+            echo=self.SQL_ECHO,
+            pool_size=self.DB_POOL_SIZE,
+            max_overflow=self.DB_MAX_OVERFLOW,
+            pool_recycle=self.DB_POOL_RECYCLE,
+            pool_mode=self.DB_POOL_MODE,
+        )
 
     class Config:
         env_file = ".env"

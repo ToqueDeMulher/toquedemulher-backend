@@ -29,5 +29,38 @@ Backend completo para o e-commerce de beleza e perfumes **O Toque de Mulher**, d
 - **Emails:** Boas-vindas, confirmação de pedido, envio e redefinição de senha
 - **Admin:** Endpoints protegidos para gestão de produtos, pedidos e usuários
 
+## Conexão com Supabase
+
+O backend usa SQLAlchemy/SQLModel com Postgres. Para apontar para a Supabase,
+crie um `.env` a partir de `.env.example` e preencha uma das opções:
+
+- `DATABASE_URL` com a connection string completa do dashboard da Supabase.
+- Ou `SUPABASE_PROJECT_REF` + `SUPABASE_DB_PASSWORD`, para o backend montar a URL direta `db.<project-ref>.supabase.co`.
+
+Use conexão direta para backend persistente com IPv6. Em ambientes IPv4-only,
+use a URL do Supavisor em session mode no `DATABASE_URL`. Se usar Supavisor
+transaction mode na porta `6543`, defina `DB_POOL_MODE=null`.
+
+Para validar sem expor segredos:
+
+```bash
+python scripts/check_supabase_connection.py
+```
+
 ## Estrutura do Projeto
- https://docs.google.com/document/d/1N4774-DWwkNtCF7AEbAsxhwpKiUNp7PtfbrS7IxiDHo/edit?usp=sharing
+
+```text
+app/                 Código da API FastAPI
+app/api/v1/          Rotas HTTP versionadas
+app/api/v1/experimental/ Rotas não registradas, mantidas só como referência
+app/core/            Configuração, segurança, banco e utilitários centrais
+app/models/          Modelos persistidos no banco
+app/schemas/         Schemas de entrada e saída
+app/services/        Regras de negócio e integrações externas
+alembic/             Migrações Alembic legadas
+supabase/            Configuração e migrations usadas pela integração Supabase
+scripts/             Scripts operacionais
+docs/api-client/     Coleções de teste de API, incluindo Bruno
+tests/               Testes automatizados
+static/uploads/      Arquivos servidos localmente em desenvolvimento
+```
