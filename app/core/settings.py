@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     )
     API_V1_PREFIX: str = "/api/v1"
 
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     SECRET_KEY: str
     FRONTEND_SUCCESS_URL: str
     FRONTEND_PENDING_URL: str

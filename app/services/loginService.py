@@ -1,25 +1,27 @@
-from app.models.user import UserInDB
-from app.schemas.user import TokenData
-from passlib.context import CryptContext
+from typing import Annotated, Dict, Any
+
 from datetime import datetime, timedelta, timezone
+
 import jwt
-from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
-from typing import Dict, Any
+from passlib.context import CryptContext
 from sqlmodel import Session, select
+
 from app.core.db import Database
 from app.core.settings import settings
+from app.models.user import UserInDB
+from app.schemas.user import TokenData
 
 
-ALGORITHM = "HS256"
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  #"deprecated="auto"" fará com que senhas com hashes antigos sejam atualizadas automaticamente na próxima vez que o usuário fizer login.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/user/login")
 
+
 class LoginAndJWT():
-    
+
     def verify_password(password, password_in_db):
         return pwd_context.verify(password, password_in_db)
 
@@ -31,24 +33,22 @@ class LoginAndJWT():
         if expires_delta:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-
+            expire = datetime.now(timezone.utc) + timedelta(
+                minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+            )
         to_encode.update({"exp": expire})
-
-        encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM) #"jwt.encode" Retorna um Token
-        return encoded_jwt
+        return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
     def create_refresh_token(data: dict, expires_delta: timedelta | None = None):
         to_encode = data.copy()
         if expires_delta:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.now(timezone.utc) + timedelta(days=7)
-
+            expire = datetime.now(timezone.utc) + timedelta(
+                days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+            )
         to_encode.update({"exp": expire, "type": "refresh"})
-
-        encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
-        return encoded_jwt
+        return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
     # PART 2
 
@@ -65,7 +65,7 @@ class LoginAndJWT():
             headers={"WWW-Authenticate": "Bearer"},
         )
         try:
-            payload: Dict[str, Any] = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM]) # Decodifica o jwt 
+            payload: Dict[str, Any] = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             username = payload.get("sub") # retorna o email passado
             if username is None:
                 raise credentials_exception

@@ -8,9 +8,9 @@ import os
 # Adicionar o diretório raiz ao path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.db.base import Base
-from app.core.config import settings
-import app.models  # noqa: F401 - importa todos os modelos
+from sqlmodel import SQLModel
+from app.core.settings import settings
+import app.models  # noqa: F401 — garante que todos os modelos SQLModel sejam registrados
 
 config = context.config
 
@@ -20,7 +20,7 @@ config.set_main_option("sqlalchemy.url", settings.database_url)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = Base.metadata
+target_metadata = SQLModel.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

@@ -1,15 +1,51 @@
-from app.models.user import User, Address
-from app.models.product import Product, ProductImage, Category, ProductVariant
-from app.models.cart import Cart, CartItem
-from app.models.order import Order, OrderItem, OrderTracking
+# Importa todos os modelos SQLModel (Stack A) para que o SQLModel.metadata
+# os conheça ao criar tabelas e para que o Alembic os encontre via este módulo.
+from app.models.user import UserInDB
+from app.models.address import Address
+from app.models.brand import Brand
+from app.models.category import Category
+from app.models.categoryProductLink import CategoryProductLink
+from app.models.coupon import Coupon
+from app.models.description import Description
+from app.models.product import Product
+from app.models.productImage import ProductImage
+from app.models.productReview import ProductReview
+from app.models.cart import Cart
+from app.models.cartItem import CartItem
+from app.models.order import Order
+from app.models.orderItem import OrderItem
+from app.models.orderCouponLink import OrderCouponLink
 from app.models.payment import Payment
-from app.models.review import Review, ReviewImage
+from app.models.paymentItem import PaymentItem
+from app.models.paymentMethod import PaymentMethod
+from app.models.stock import Stock
+from app.models.stockMovement import StockMovement
+from app.models.stock_batch import StockBatch
+from app.models.supplier import Supplier
+from app.models.supplier_product import SupplierProduct
 
 __all__ = [
-    "User", "Address",
-    "Product", "ProductImage", "Category", "ProductVariant",
-    "Cart", "CartItem",
-    "Order", "OrderItem", "OrderTracking",
+    "UserInDB",
+    "Address",
+    "Brand",
+    "Category",
+    "CategoryProductLink",
+    "Coupon",
+    "Description",
+    "Product",
+    "ProductImage",
+    "ProductReview",
+    "Cart",
+    "CartItem",
+    "Order",
+    "OrderItem",
+    "OrderCouponLink",
     "Payment",
-    "Review", "ReviewImage",
+    "PaymentItem",
+    "PaymentMethod",
+    "Stock",
+    "StockMovement",
+    "StockBatch",
+    "Supplier",
+    "SupplierProduct",
 ]

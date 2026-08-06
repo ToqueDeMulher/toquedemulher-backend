@@ -8,7 +8,7 @@ from enum import Enum
 
 class UserRole(str, Enum):
     ADMIN = "admin"
-    CLIENT = "cliente"
+    CLIENT = "customer"
 
 class UserInDB(SQLModel, table=True):
     __tablename__ = "user"
@@ -29,7 +29,7 @@ class UserInDB(SQLModel, table=True):
     deleted_at: Optional[datetime] = None
     disabled: bool = Field(default=False)
 
-    role: str = Field(default=UserRole.CLIENT, nullable=False)
+    role: str = Field(default=UserRole.CLIENT.value, nullable=False)
     addresses: List["Address"] = Relationship(back_populates="user")    #type: ignore
     orders: List["Order"] = Relationship(back_populates="user")         #type: ignore
     carts: List["Cart"] = Relationship(back_populates="user")           #type: ignore
