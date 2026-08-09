@@ -7,8 +7,8 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  gitleaks:
-    name: Detect Leaked Secrets
+  trufflehog:
+    name: TruffleHog Secret Scanner
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -16,7 +16,7 @@ jobs:
         with:
           fetch-depth: 0 
 
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
