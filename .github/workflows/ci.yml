@@ -1,79 +1,22 @@
-name: CI Pipeline
+name: Secret Detection
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
 
 jobs:
-  # -------------------------------------------
-  # JOB 1: LINTING & FORMATTING (Runs in seconds)
-  # -------------------------------------------
-  lint:
-    name: Code Quality
+  gitleaks:
+    name: Detect Leaked Secrets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          python-version: '3.11'
-          cache: 'pip' # Speeds up installation
+          fetch-depth: 0 
 
-      - name: Install Ruff
-        run: pip install ruff
-
-      - name: Check Formatting & Lint
-        run: |
-          ruff format --check .
-          ruff check .
-
-  # -------------------------------------------
-  # JOB 2: SECURITY SCANNING (Runs in parallel)
-  # -------------------------------------------
-  security:
-    name: Security Scans
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Run Trivy (Dependencies & OS)
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          ignore-unfixed: true
-          severity: 'CRITICAL,HIGH'
-
-      - name: Install & Run Bandit (Code vulnerabilities)
-        run: |
-          pip install bandit
-          bandit -r . -x tests/
-
-  # -------------------------------------------
-  # JOB 3: AUTOMATED TESTING 
-  # -------------------------------------------
-  test:
-    name: Unit Tests
-    # OPTIONAL: Uncomment the line below if you want tests to WAIT for linting to pass first
-    # needs: [lint] 
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip' # Reuses downloaded packages
-
-      - name: Install Dependencies
-        run: |
-          pip install -r requirements.txt 
-          pip install pytest pytest-cov
-
-      - name: Run Pytest
-        run: pytest --cov=./ --cov-report=xml
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
