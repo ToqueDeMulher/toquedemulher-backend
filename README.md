@@ -2,6 +2,30 @@
 
 Backend completo para o e-commerce de beleza e perfumes **O Toque de Mulher**, desenvolvido com **Python + FastAPI** e banco de dados **PostgreSQL**.
 
+## Inicio rapido
+
+Use dois terminais: um para o backend e outro para o frontend.
+
+Terminal do backend:
+
+```bash
+cd toquedemulher-backend
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python scripts/check_supabase_connection.py
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+A API fica em:
+
+- `http://127.0.0.1:8000`
+- `http://127.0.0.1:8000/health`
+- `http://127.0.0.1:8000/docs`
+
+Se o servidor ja estiver rodando e voce alterar o `.env`, reinicie o backend.
+Variaveis de ambiente sao carregadas na inicializacao do processo.
+
 ## Tecnologias
 
 | Tecnologia | Versão | Finalidade |
@@ -29,10 +53,31 @@ Backend completo para o e-commerce de beleza e perfumes **O Toque de Mulher**, d
 - **Emails:** Boas-vindas, confirmação de pedido, envio e redefinição de senha
 - **Admin:** Endpoints protegidos para gestão de produtos, pedidos e usuários
 
+## Configuracao local
+
+Crie um arquivo `.env` na raiz de `toquedemulher-backend`. Nao commite esse
+arquivo.
+
+Exemplo:
+
+```env
+DATABASE_URL=postgresql://postgres.<project-ref>:<senha>@aws-0-ca-central-1.pooler.supabase.com:5432/postgres?sslmode=require
+SECRET_KEY=troque-por-uma-chave-forte
+GOOGLE_CLIENT_ID=seu-client-id.apps.googleusercontent.com
+```
+
+Variaveis principais:
+
+- `DATABASE_URL`: connection string do Postgres/Supabase.
+- `SECRET_KEY`: chave usada para assinar JWTs.
+- `GOOGLE_CLIENT_ID`: OAuth Client ID web do Google.
+- `VITE_GOOGLE_CLIENT_ID`: fallback aceito pelo backend caso a variavel do frontend tenha sido copiada para o servidor.
+- `CORS_ORIGINS`: origens permitidas, por padrao inclui `http://localhost:5173` e `http://127.0.0.1:5173`.
+
 ## Conexão com Supabase
 
 O backend usa SQLAlchemy/SQLModel com Postgres. Para apontar para a Supabase,
-crie um `.env` a partir de `.env.example` e preencha uma das opções:
+crie um `.env` e preencha uma das opções:
 
 - `DATABASE_URL` com a connection string completa do dashboard da Supabase.
 - Ou `SUPABASE_PROJECT_REF` + `SUPABASE_DB_PASSWORD`, para o backend montar a URL direta `db.<project-ref>.supabase.co`.
@@ -46,6 +91,10 @@ Para validar sem expor segredos:
 ```bash
 python scripts/check_supabase_connection.py
 ```
+
+Neste projeto a Supabase esta sendo usada como Postgres. A autenticacao atual
+e propria do FastAPI, com usuarios e JWTs do backend. Nao e necessario ativar
+o provider Google em Supabase Auth para o fluxo atual.
 
 ## Login com Google
 
@@ -61,6 +110,76 @@ GOOGLE_CLIENT_ID=seu-client-id.apps.googleusercontent.com
 O backend também aceita `VITE_GOOGLE_CLIENT_ID` como fallback para ambientes
 em que a mesma variável pública do frontend foi usada na configuração do
 servidor.
+
+Nao use `GOOGLE_CLIENT_SECRET` neste fluxo. O frontend usa Google Identity
+Services para obter um ID token, e o backend valida esse token pelo Client ID.
+
+Se a API retornar:
+
+```json
+{"detail": "Login com Google nao configurado"}
+```
+
+entao o processo do backend iniciou sem `GOOGLE_CLIENT_ID` ou
+`VITE_GOOGLE_CLIENT_ID`. Confirme o `.env`, reinicie o backend e, em deploy,
+cadastre a variavel de ambiente no painel da plataforma.
+
+Com uma credencial falsa, a API configurada deve responder:
+
+```json
+{"detail": "Credential do Google invalida"}
+```
+
+Isso indica que o Client ID foi carregado e que apenas o token enviado nao e
+valido.
+
+## Login e acesso admin
+
+A tela de login nao possui mais botao "entrar como admin" ou "entrar como
+cliente". O login e unico.
+
+O redirecionamento para `/admin` acontece automaticamente quando o usuario
+autenticado tem `role = "admin"` no backend. Usuarios comuns sao enviados para
+o perfil.
+
+## Enderecos e checkout
+
+O frontend consome os endpoints de endereco do backend:
+
+- `GET /api/v1/addresses/`
+- `POST /api/v1/addresses/`
+- `PUT /api/v1/addresses/{address_id}`
+- `DELETE /api/v1/addresses/{address_id}`
+
+No checkout, se o usuario logado ja tiver um endereco salvo, o frontend usa o
+endereco padrao de entrega. Caso contrario, mostra a opcao de adicionar um novo
+endereco e salvar no perfil.
+
+## Testes e verificacao
+
+Rode os testes automatizados:
+
+```bash
+source .venv/bin/activate
+python -m pytest tests/test_auth.py -q
+```
+
+Verifique a API local:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Verifique o Google Login sem usar credencial real:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/user/google \
+  -H "Content-Type: application/json" \
+  -d '{"credential":"fake"}'
+```
+
+Se o backend estiver configurado, a resposta sera `Credential do Google
+invalida`, nao `Login com Google nao configurado`.
 
 ## Estrutura do Projeto
 
