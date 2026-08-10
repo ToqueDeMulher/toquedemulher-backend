@@ -27,6 +27,9 @@ def login(login_credentials: Login, session: _SessionDep) -> Token:
     ):
         raise HTTPException(status_code=401, detail="incorrect Email or password")
 
+    if existing_user.disabled:
+        raise HTTPException(status_code=400, detail="Conta inativa")
+
     if settings.EMAIL_CONFIRMATION_REQUIRED and not existing_user.email_confirmed_at:
         raise HTTPException(status_code=403, detail="Confirme seu email antes de entrar")
 

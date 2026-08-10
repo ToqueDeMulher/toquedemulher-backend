@@ -4,11 +4,14 @@ from sqlmodel import select
 from app.api.dependencies import CurrentUser, addToDB
 from app.core.db import _SessionDep
 from app.core.time import utc_now
+from app.models.address import Address
+from app.models.cart import Cart
 from app.models.payment import Payment
 from app.models.paymentItem import PaymentItem
 from app.models.product import Product
 from app.models.productReview import ProductReview
 from app.models.user import UserInDB
+from app.models.userPaymentMethod import UserPaymentMethod
 from app.schemas.account import (
     AccountOrderItemResponse,
     AccountOrderResponse,
@@ -169,13 +172,74 @@ def delete_user(data: DeleteAccountRequest, session: _SessionDep, user: CurrentU
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario nao encontrado")
 
-    if not LoginAndJWT.verify_password(data.current_password, db_user.hashed_password):
-        raise HTTPException(status_code=400, detail="Senha incorreta")
+    if data.confirm_email.lower() != db_user.email.lower():
+        raise HTTPException(status_code=400, detail="Email de confirmacao invalido")
 
-    if data.confirm_text.upper() != "DELETE":
+    if data.confirm_text.strip().upper() != "DELETE":
         raise HTTPException(status_code=400, detail="Confirmacao invalida")
 
-    session.delete(db_user)
+    current_password = data.current_password.strip() if data.current_password else None
+    if current_password and not LoginAndJWT.verify_password(
+        current_password,
+        db_user.hashed_password,
+    ):
+        raise HTTPException(status_code=400, detail="Senha incorreta")
+
+    now = utc_now()
+    anonymized_email = f"deleted-{db_user.id.hex}@toquedemulher.invalid"
+
+    for payment_method in session.exec(
+        select(UserPaymentMethod).where(UserPaymentMethod.user_id == db_user.id)
+    ).all():
+        session.delete(payment_method)
+
+    for review in session.exec(
+        select(ProductReview).where(ProductReview.user_id == db_user.id)
+    ).all():
+        session.delete(review)
+
+    for address in session.exec(
+        select(Address).where(Address.user_id == db_user.id)
+    ).all():
+        address.label = None
+        address.cep = "00000000"
+        address.street = "Endereco removido"
+        address.number = None
+        address.complement = None
+        address.neighborhood = None
+        address.city = "Removido"
+        address.state = "NA"
+        address.region = None
+        address.ddd = None
+        address.is_default_shipping = False
+        address.is_default_billing = False
+        session.add(address)
+
+    for payment in session.exec(
+        select(Payment).where(Payment.user_id == db_user.id)
+    ).all():
+        payment.payer_email = anonymized_email
+        payment.updated_at = now
+        session.add(payment)
+
+    for cart in session.exec(select(Cart).where(Cart.user_id == db_user.id)).all():
+        cart.status = "excluido"
+        cart.updated_at = now
+        session.add(cart)
+
+    db_user.name = "Conta excluida"
+    db_user.email = anonymized_email
+    db_user.hashed_password = LoginAndJWT.hashing_password(f"deleted:{db_user.id}:{now}")
+    db_user.cpf = None
+    db_user.phone = None
+    db_user.gender = None
+    db_user.birth_date = None
+    db_user.accepts_marketing = False
+    db_user.email_confirmed_at = None
+    db_user.deleted_at = now
+    db_user.updated_at = now
+    db_user.disabled = True
+    session.add(db_user)
     session.commit()
 
     return Message(mensagem="Conta excluida com sucesso")

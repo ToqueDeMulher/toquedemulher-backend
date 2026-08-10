@@ -37,7 +37,8 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 class DeleteAccountRequest(BaseModel):
-    current_password: str
+    current_password: Optional[str] = None
+    confirm_email: EmailStr
     confirm_text: str
 
 class Token (BaseModel):

@@ -321,6 +321,145 @@ def test_update_my_profile():
     assert profile["accepts_marketing"] is True
 
 
+def test_delete_my_account_anonymizes_user_and_blocks_old_login():
+    email = "maria@example.com"
+    token = create_logged_user(email=email)
+
+    response = client.request(
+        "DELETE",
+        "/api/v1/user/me",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "Senha@123",
+            "confirm_email": email,
+            "confirm_text": "DELETE",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["mensagem"] == "Conta excluida com sucesso"
+
+    old_token_response = client.get(
+        "/api/v1/user/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert old_token_response.status_code == 401
+
+    login_response = client.post(
+        "/api/v1/user/login",
+        json={
+            "email": email,
+            "password": "Senha@123",
+        },
+    )
+    assert login_response.status_code == 401
+
+    register_response = client.post(
+        "/api/v1/user/register",
+        json={
+            "name": "Maria Silva",
+            "email": email,
+            "password": "NovaSenha@123",
+        },
+    )
+    assert register_response.status_code == 201
+
+    with Session(engine) as session:
+        deleted_user = session.exec(
+            select(UserInDB).where(UserInDB.disabled == True)  # noqa: E712
+        ).one()
+
+    assert deleted_user.deleted_at is not None
+    assert deleted_user.email != email
+    assert deleted_user.name == "Conta excluida"
+    assert deleted_user.cpf is None
+    assert deleted_user.phone is None
+    assert deleted_user.accepts_marketing is False
+
+
+def test_delete_my_account_requires_matching_confirmation():
+    token = create_logged_user()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    wrong_email_response = client.request(
+        "DELETE",
+        "/api/v1/user/me",
+        headers=headers,
+        json={
+            "current_password": "Senha@123",
+            "confirm_email": "outra@example.com",
+            "confirm_text": "DELETE",
+        },
+    )
+    assert wrong_email_response.status_code == 400
+
+    wrong_text_response = client.request(
+        "DELETE",
+        "/api/v1/user/me",
+        headers=headers,
+        json={
+            "current_password": "Senha@123",
+            "confirm_email": "maria@example.com",
+            "confirm_text": "EXCLUIR",
+        },
+    )
+    assert wrong_text_response.status_code == 400
+
+
+def test_delete_my_account_rejects_wrong_password_when_provided():
+    token = create_logged_user()
+
+    response = client.request(
+        "DELETE",
+        "/api/v1/user/me",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "SenhaErrada",
+            "confirm_email": "maria@example.com",
+            "confirm_text": "DELETE",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Senha incorreta"
+
+
+def test_google_user_can_delete_account_without_password(monkeypatch):
+    class FakeGoogleIdentity:
+        sub = "google-user-123"
+        email = "google-user@example.com"
+        name = "Google User"
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.login.verify_google_credential",
+        lambda _: FakeGoogleIdentity(),
+    )
+
+    login_response = client.post(
+        "/api/v1/user/google",
+        json={"credential": "google-id-token"},
+    )
+    token = login_response.json()["access_token"]
+
+    response = client.request(
+        "DELETE",
+        "/api/v1/user/me",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "confirm_email": "google-user@example.com",
+            "confirm_text": "DELETE",
+        },
+    )
+
+    assert response.status_code == 200
+
+    old_token_response = client.get(
+        "/api/v1/user/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert old_token_response.status_code == 401
+
+
 def test_manage_addresses_keeps_single_default_shipping_address():
     token = create_logged_user()
     headers = {"Authorization": f"Bearer {token}"}
