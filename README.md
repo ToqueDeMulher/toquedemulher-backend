@@ -149,8 +149,12 @@ subject = "Confirm your email address"
 content_path = "./supabase/templates/confirmation.html"
 ```
 
-O template usa HTML de e-mail com estilos inline, botao principal e link de
-fallback com `{{ .ConfirmationURL }}`.
+O template usa HTML de e-mail com estilos inline, logo em lockup tipografico
+`toque de mulher`, botao principal e link de fallback com
+`{{ .ConfirmationURL }}`. A fonte principal e a mesma do frontend:
+`all-round-gothic`, carregada pelo projeto Adobe Fonts
+`https://use.typekit.net/ocs2tdf.css`; clientes de e-mail que bloquearem
+webfonts usam `Poppins`/`Arial` como fallback.
 
 Em projeto hosted da Supabase, cole o HTML desse arquivo no Dashboard em
 `Authentication > Email Templates > Confirm signup`. Em projetos free criados

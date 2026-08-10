@@ -6,8 +6,22 @@
     <meta name="color-scheme" content="light">
     <meta name="supported-color-schemes" content="light">
     <title>Confirm your email address</title>
+    <link rel="preconnect" href="https://use.typekit.net">
+    <link rel="preconnect" href="https://p.typekit.net" crossorigin>
+    <link rel="stylesheet" href="https://use.typekit.net/ocs2tdf.css">
+    <style>
+      body,
+      table,
+      td,
+      a,
+      p,
+      h1,
+      span {
+        font-family: "all-round-gothic", "Poppins", Arial, Helvetica, sans-serif;
+      }
+    </style>
   </head>
-  <body style="margin:0; padding:0; background:#f7f2f4; color:#231f20; font-family:Arial, Helvetica, sans-serif;">
+  <body style="margin:0; padding:0; background:#f7f2f4; color:#231f20; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif;">
     <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent;">
       Confirm your Toque de Mulher account and finish signing up.
     </div>
@@ -17,11 +31,26 @@
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; max-width:560px; background:#ffffff; border:1px solid #f0d8e1; border-radius:18px; overflow:hidden;">
             <tr>
-              <td style="padding:32px 32px 18px; background:#231f20;">
-                <p style="margin:0; color:#f8dce8; font-size:13px; line-height:18px; letter-spacing:0.08em; text-transform:uppercase; font-weight:700;">
-                  Toque de Mulher
-                </p>
-                <h1 style="margin:12px 0 0; color:#ffffff; font-size:30px; line-height:36px; font-weight:700;">
+              <td style="padding:30px 32px 20px; background:#231f20;">
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
+                  <tr>
+                    <td width="46" height="46" align="center" valign="middle" style="width:46px; height:46px; background:#f73986; border-radius:14px;">
+                      <span style="display:block; color:#ffffff; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; font-size:16px; line-height:18px; font-weight:800; letter-spacing:0; text-transform:lowercase;">
+                        tm
+                      </span>
+                    </td>
+                    <td style="padding-left:14px;">
+                      <p style="margin:0; color:#ffffff; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; font-size:25px; line-height:25px; font-weight:800; letter-spacing:0; text-transform:lowercase;">
+                        toque de mulher
+                      </p>
+                      <p style="margin:5px 0 0; color:#f8dce8; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; font-size:12px; line-height:16px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;">
+                        beleza com cuidado
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+
+                <h1 style="margin:0; color:#ffffff; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; font-size:30px; line-height:36px; font-weight:800; letter-spacing:0;">
                   Confirm your email address
                 </h1>
               </td>
@@ -29,29 +58,29 @@
 
             <tr>
               <td style="padding:32px;">
-                <p style="margin:0 0 18px; color:#3a3235; font-size:16px; line-height:25px;">
+                <p style="margin:0 0 18px; color:#3a3235; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; font-size:16px; line-height:25px;">
                   Follow the link below to confirm this email address and finish signing up.
                 </p>
 
                 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 30px;">
                   <tr>
                     <td align="center" bgcolor="#e53d7a" style="border-radius:12px;">
-                      <a href="{{ .ConfirmationURL }}" style="display:inline-block; padding:15px 24px; color:#ffffff; font-size:16px; line-height:20px; font-weight:700; text-decoration:none; border-radius:12px;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block; padding:15px 24px; color:#ffffff; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; font-size:16px; line-height:20px; font-weight:800; letter-spacing:0; text-decoration:none; border-radius:12px;">
                         Confirm email address
                       </a>
                     </td>
                   </tr>
                 </table>
 
-                <p style="margin:0 0 12px; color:#6d6065; font-size:14px; line-height:22px;">
+                <p style="margin:0 0 12px; color:#6d6065; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; font-size:14px; line-height:22px;">
                   If the button does not work, copy and paste this link into your browser:
                 </p>
 
-                <p style="margin:0; padding:14px 16px; background:#fbf4f7; border:1px solid #f0d8e1; border-radius:10px; color:#7a2d4f; font-size:13px; line-height:20px; word-break:break-all;">
-                  <a href="{{ .ConfirmationURL }}" style="color:#b7195b; text-decoration:underline;">{{ .ConfirmationURL }}</a>
+                <p style="margin:0; padding:14px 16px; background:#fbf4f7; border:1px solid #f0d8e1; border-radius:10px; color:#7a2d4f; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; word-break:break-all;">
+                  <a href="{{ .ConfirmationURL }}" style="color:#b7195b; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; text-decoration:underline;">{{ .ConfirmationURL }}</a>
                 </p>
 
-                <p style="margin:28px 0 0; color:#6d6065; font-size:14px; line-height:22px;">
+                <p style="margin:28px 0 0; color:#6d6065; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; font-size:14px; line-height:22px;">
                   If you did not create an account, you can safely ignore this email.
                 </p>
               </td>
@@ -59,7 +88,7 @@
 
             <tr>
               <td style="padding:22px 32px; background:#fbf4f7; border-top:1px solid #f0d8e1;">
-                <p style="margin:0; color:#8a7a80; font-size:12px; line-height:18px;">
+                <p style="margin:0; color:#8a7a80; font-family:'all-round-gothic', 'Poppins', Arial, Helvetica, sans-serif; font-size:12px; line-height:18px;">
                   This confirmation link may expire shortly for your security.
                 </p>
               </td>
