@@ -9,8 +9,8 @@ class SupplierProduct(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
 
-    supplier_id: int = Field(foreign_key="supplier.id")
-    product_id: UUID = Field(foreign_key="product.id")
+    supplier_id: int = Field(foreign_key="supplier.id", index=True)
+    product_id: UUID = Field(foreign_key="product.id", index=True)
 
     supplier_price: float  # preço do fornecedor
     lead_time_days: Optional[int] = None

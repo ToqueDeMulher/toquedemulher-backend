@@ -4,19 +4,7 @@ from fastapi import Depends
 from sqlmodel import SQLModel, Session, create_engine
 
 from app.core.settings import settings
-from app.models.address import Address
-from app.models.cart import Cart
-from app.models.cartItem import CartItem
-from app.models.coupon import Coupon
-from app.models.order import Order
-from app.models.orderItem import OrderItem
-from app.models.payment import Payment
-from app.models.paymentItem import PaymentItem
-from app.models.product import Product
-from app.models.stock_batch import StockBatch
-from app.models.stockMovement import StockMovement
-from app.models.supplier_product import SupplierProduct
-from app.models.user import UserInDB
+import app.models  # noqa: F401
 
 
 class Database:

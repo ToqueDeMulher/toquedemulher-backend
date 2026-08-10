@@ -10,8 +10,8 @@ class StockBatch(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
 
     product_id: UUID = Field(foreign_key="product.id", index=True)
-    supplier_id: Optional[int] = Field(default=None, foreign_key="supplier.id")
-    stock_id: UUID = Field(foreign_key="stock.id")
+    supplier_id: Optional[int] = Field(default=None, foreign_key="supplier.id", index=True)
+    stock_id: UUID = Field(foreign_key="stock.id", index=True)
 
     quantity: int = Field(ge=0)
     unit_cost: float  
