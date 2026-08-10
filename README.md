@@ -133,6 +133,36 @@ Com uma credencial falsa, a API configurada deve responder:
 Isso indica que o Client ID foi carregado e que apenas o token enviado nao e
 valido.
 
+## Template de confirmacao de e-mail
+
+O template de confirmacao do Supabase Auth local/self-hosted esta em:
+
+```text
+supabase/templates/confirmation.html
+```
+
+Ele e referenciado em `supabase/config.toml`:
+
+```toml
+[auth.email.template.confirmation]
+subject = "Confirm your email address"
+content_path = "./supabase/templates/confirmation.html"
+```
+
+Conteudo atual:
+
+```html
+<h2>Confirm your email address</h2>
+
+<p>Follow the link below to confirm this email address and finish signing up.</p>
+<p><a href="{{ .ConfirmationURL }}">Confirm email address</a></p>
+```
+
+Em projeto hosted da Supabase, cole o mesmo HTML no Dashboard em
+`Authentication > Email Templates > Confirm signup`. Em projetos free criados
+depois de 3 de junho de 2026, a Supabase pode exigir SMTP proprio para
+customizar templates.
+
 ## Login e acesso admin
 
 A tela de login nao possui mais botao "entrar como admin" ou "entrar como
