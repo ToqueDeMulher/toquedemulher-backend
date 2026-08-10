@@ -23,9 +23,11 @@ from app.models.stockMovement import StockMovement
 from app.models.supplier import Supplier
 from app.models.supplier_product import SupplierProduct
 from app.models.user import UserInDB
+from app.models.userPaymentMethod import UserPaymentMethod
 
 __all__ = [
     "UserInDB",
+    "UserPaymentMethod",
     "Address",
     "Brand",
     "Category",

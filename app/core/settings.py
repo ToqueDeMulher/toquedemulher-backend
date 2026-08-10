@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     FRONTEND_PENDING_URL: str = "http://localhost:5173/checkout/pending"
     FRONTEND_FAILURE_URL: str = "http://localhost:5173/checkout/failure"
     FRONTEND_URL: str = "http://localhost:5173"
+    GOOGLE_CLIENT_ID: str = ""
 
     SUPABASE_PROJECT_REF: str = DEFAULT_SUPABASE_PROJECT_REF
     SUPABASE_DB_PASSWORD: str = ""

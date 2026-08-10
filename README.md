@@ -47,6 +47,17 @@ Para validar sem expor segredos:
 python scripts/check_supabase_connection.py
 ```
 
+## Login com Google
+
+O endpoint `POST /api/v1/user/google` recebe o `credential` emitido pelo
+Google Identity Services, valida o ID token e emite os tokens JWT do backend.
+
+Configure no `.env`:
+
+```env
+GOOGLE_CLIENT_ID=seu-client-id.apps.googleusercontent.com
+```
+
 ## Estrutura do Projeto
 
 ```text

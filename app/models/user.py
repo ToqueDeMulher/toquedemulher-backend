@@ -31,8 +31,8 @@ class UserInDB(SQLModel, table=True):
 
     role: str = Field(default=UserRole.CLIENT.value, nullable=False)
     addresses: List["Address"] = Relationship(back_populates="user")    #type: ignore
+    payment_methods: List["UserPaymentMethod"] = Relationship(back_populates="user")  # type: ignore
     orders: List["Order"] = Relationship(back_populates="user")         #type: ignore
     carts: List["Cart"] = Relationship(back_populates="user")           #type: ignore
     reviews: List["ProductReview"] = Relationship(back_populates="user")
     payments: List["Payment"] = Relationship(back_populates="user")     #type: ignore
-    

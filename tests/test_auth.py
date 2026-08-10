@@ -47,6 +47,25 @@ def clean_db():
     yield
 
 
+def create_logged_user(email: str = "maria@example.com") -> str:
+    client.post(
+        "/api/v1/user/register",
+        json={
+            "name": "Maria Silva",
+            "email": email,
+            "password": "Senha@123",
+        },
+    )
+    login_response = client.post(
+        "/api/v1/user/login",
+        json={
+            "email": email,
+            "password": "Senha@123",
+        },
+    )
+    return login_response.json()["access_token"]
+
+
 def test_health_check():
     response = client.get("/health")
 
@@ -127,23 +146,35 @@ def test_login_wrong_password():
     assert response.status_code == 401
 
 
+def test_google_login_creates_user_and_returns_tokens(monkeypatch):
+    class FakeGoogleIdentity:
+        sub = "google-user-123"
+        email = "google-user@example.com"
+        name = "Google User"
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.login.verify_google_credential",
+        lambda _: FakeGoogleIdentity(),
+    )
+
+    response = client.post(
+        "/api/v1/user/google",
+        json={"credential": "google-id-token"},
+    )
+
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+
+    me_response = client.get(
+        "/api/v1/user/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert me_response.status_code == 200
+    assert me_response.json()["email"] == "google-user@example.com"
+
+
 def test_get_my_profile():
-    client.post(
-        "/api/v1/user/register",
-        json={
-            "name": "Maria Silva",
-            "email": "maria@example.com",
-            "password": "Senha@123",
-        },
-    )
-    login_response = client.post(
-        "/api/v1/user/login",
-        json={
-            "email": "maria@example.com",
-            "password": "Senha@123",
-        },
-    )
-    token = login_response.json()["access_token"]
+    token = create_logged_user()
 
     response = client.get(
         "/api/v1/user/me",
@@ -158,3 +189,130 @@ def test_protected_route_without_token():
     response = client.get("/api/v1/user/me")
 
     assert response.status_code == 401
+
+
+def test_update_my_profile():
+    token = create_logged_user()
+
+    response = client.put(
+        "/api/v1/user/me",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "name": "Maria Souza",
+            "phone": "61999999999",
+            "cpf": "12345678901",
+            "gender": "feminino",
+            "birth_date": "1995-05-10",
+            "accepts_marketing": True,
+        },
+    )
+
+    assert response.status_code == 200
+
+    profile_response = client.get(
+        "/api/v1/user/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    profile = profile_response.json()
+    assert profile["name"] == "Maria Souza"
+    assert profile["phone"] == "61999999999"
+    assert profile["accepts_marketing"] is True
+
+
+def test_manage_addresses_keeps_single_default_shipping_address():
+    token = create_logged_user()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    first_response = client.post(
+        "/api/v1/addresses/",
+        headers=headers,
+        json={
+            "label": "Casa",
+            "cep": "70000000",
+            "street": "Rua A",
+            "number": "10",
+            "neighborhood": "Centro",
+            "city": "Brasilia",
+            "state": "DF",
+            "region": "Centro-Oeste",
+            "ddd": "61",
+            "is_default_shipping": True,
+            "is_default_billing": False,
+        },
+    )
+    assert first_response.status_code == 201
+
+    second_response = client.post(
+        "/api/v1/addresses/",
+        headers=headers,
+        json={
+            "label": "Trabalho",
+            "cep": "71000000",
+            "street": "Rua B",
+            "number": "20",
+            "neighborhood": "Asa Norte",
+            "city": "Brasilia",
+            "state": "DF",
+            "region": "Centro-Oeste",
+            "ddd": "61",
+            "is_default_shipping": True,
+            "is_default_billing": False,
+        },
+    )
+    assert second_response.status_code == 201
+
+    addresses_response = client.get("/api/v1/addresses/", headers=headers)
+
+    assert addresses_response.status_code == 200
+    addresses = addresses_response.json()
+    default_addresses = [
+        address for address in addresses if address["is_default_shipping"]
+    ]
+    assert len(default_addresses) == 1
+    assert default_addresses[0]["label"] == "Trabalho"
+
+
+def test_manage_payment_methods_without_storing_sensitive_card_data():
+    token = create_logged_user()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    card_response = client.post(
+        "/api/v1/payment-methods/",
+        headers=headers,
+        json={
+            "method_type": "card",
+            "label": "Cartao principal",
+            "holder_name": "Maria Silva",
+            "billing_document": "12345678901",
+            "card_brand": "visa",
+            "card_last4": "4242",
+            "card_exp_month": 12,
+            "card_exp_year": 2030,
+            "cvv": "123",
+            "is_default": True,
+        },
+    )
+
+    assert card_response.status_code == 201
+    card = card_response.json()
+    assert card["card_last4"] == "4242"
+    assert "cvv" not in card
+
+    pix_response = client.post(
+        "/api/v1/payment-methods/",
+        headers=headers,
+        json={
+            "method_type": "pix",
+            "label": "Pix",
+            "billing_document": "12345678901",
+            "is_default": True,
+        },
+    )
+    assert pix_response.status_code == 201
+
+    methods_response = client.get("/api/v1/payment-methods/", headers=headers)
+
+    assert methods_response.status_code == 200
+    methods = methods_response.json()
+    assert methods[0]["method_type"] == "pix"
+    assert len([method for method in methods if method["is_default"]]) == 1

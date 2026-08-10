@@ -53,3 +53,7 @@ class Login(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
+
+class GoogleLoginRequest(BaseModel):
+    credential: str

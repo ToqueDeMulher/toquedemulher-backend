@@ -18,6 +18,11 @@ router = APIRouter(prefix="/addresses")
 @router.post("/", response_model=Message, status_code=201)
 def create_address(address_data: AddressRequest, session: _SessionDep, user: CurrentUser):
     try:
+        if address_data.is_default_shipping:
+            _unset_default_shipping_addresses(session, user.id)
+        if address_data.is_default_billing:
+            _unset_default_billing_addresses(session, user.id)
+
         new_address = Address(
             **address_data.model_dump(),
             user_id=user.id,
@@ -78,7 +83,13 @@ def update_address(
             detail="Endereço não encontrado ou não pertence ao usuário",
         )
 
-    for key, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(exclude_unset=True)
+    if update_data.get("is_default_shipping"):
+        _unset_default_shipping_addresses(session, user.id)
+    if update_data.get("is_default_billing"):
+        _unset_default_billing_addresses(session, user.id)
+
+    for key, value in update_data.items():
         setattr(address, key, value)
 
     try:
@@ -89,3 +100,29 @@ def update_address(
         raise HTTPException(status_code=500, detail="Erro no sistema") from exc
 
     return Message(mensagem="Endereço atualizado com sucesso")
+
+
+def _unset_default_shipping_addresses(session: _SessionDep, user_id: UUID) -> None:
+    addresses = session.exec(
+        select(Address).where(
+            Address.user_id == user_id,
+            Address.is_default_shipping == True,  # noqa: E712
+        )
+    ).all()
+
+    for address in addresses:
+        address.is_default_shipping = False
+        session.add(address)
+
+
+def _unset_default_billing_addresses(session: _SessionDep, user_id: UUID) -> None:
+    addresses = session.exec(
+        select(Address).where(
+            Address.user_id == user_id,
+            Address.is_default_billing == True,  # noqa: E712
+        )
+    ).all()
+
+    for address in addresses:
+        address.is_default_billing = False
+        session.add(address)
