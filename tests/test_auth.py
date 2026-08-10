@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel
+from sqlmodel import Session, SQLModel, select
 
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("SECRET_KEY", "test-secret")
@@ -28,6 +28,8 @@ from app.models.payment import Payment, PaymentStatus  # noqa: E402
 from app.models.paymentItem import PaymentItem  # noqa: E402
 from app.models.product import Product  # noqa: E402
 from app.models.productReview import ProductReview  # noqa: E402
+from app.models.user import UserInDB  # noqa: E402
+from app.services.email_confirmation_service import create_email_confirmation_token  # noqa: E402
 
 
 engine = create_engine(
@@ -92,7 +94,91 @@ def test_register_user():
     )
 
     assert response.status_code == 201
-    assert response.json()["mensagem"] == "Usuario criado com sucesso"
+    assert (
+        response.json()["mensagem"]
+        == "Usuario criado com sucesso. Verifique seu email para confirmar a conta."
+    )
+
+
+def test_register_queues_confirmation_email(monkeypatch):
+    sent_emails: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.user.send_confirmation_email",
+        lambda name, email: sent_emails.append((name, email)) or True,
+    )
+
+    response = client.post(
+        "/api/v1/user/register",
+        json={
+            "name": "Maria Silva",
+            "email": "maria@example.com",
+            "password": "Senha@123",
+        },
+    )
+
+    assert response.status_code == 201
+    assert sent_emails == [("Maria Silva", "maria@example.com")]
+
+
+def test_confirm_email_marks_user_as_confirmed():
+    email = "maria@example.com"
+    client.post(
+        "/api/v1/user/register",
+        json={
+            "name": "Maria Silva",
+            "email": email,
+            "password": "Senha@123",
+        },
+    )
+
+    token = create_email_confirmation_token(email)
+    response = client.post(
+        "/api/v1/user/confirm-email",
+        json={"token": token},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["mensagem"] == "Email confirmado com sucesso"
+
+    with Session(engine) as session:
+        user = session.exec(select(UserInDB).where(UserInDB.email == email)).one()
+        assert user.email_confirmed_at is not None
+
+
+def test_login_can_require_confirmed_email(monkeypatch):
+    email = "maria@example.com"
+    monkeypatch.setattr(settings, "EMAIL_CONFIRMATION_REQUIRED", True)
+    client.post(
+        "/api/v1/user/register",
+        json={
+            "name": "Maria Silva",
+            "email": email,
+            "password": "Senha@123",
+        },
+    )
+
+    blocked_response = client.post(
+        "/api/v1/user/login",
+        json={
+            "email": email,
+            "password": "Senha@123",
+        },
+    )
+    assert blocked_response.status_code == 403
+
+    client.post(
+        "/api/v1/user/confirm-email",
+        json={"token": create_email_confirmation_token(email)},
+    )
+    login_response = client.post(
+        "/api/v1/user/login",
+        json={
+            "email": email,
+            "password": "Senha@123",
+        },
+    )
+    assert login_response.status_code == 200
 
 
 def test_register_duplicate_email():

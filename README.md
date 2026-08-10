@@ -64,6 +64,14 @@ Exemplo:
 DATABASE_URL=postgresql://postgres.<project-ref>:<senha>@aws-0-ca-central-1.pooler.supabase.com:5432/postgres?sslmode=require
 SECRET_KEY=troque-por-uma-chave-forte
 GOOGLE_CLIENT_ID=seu-client-id.apps.googleusercontent.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_STARTTLS=true
+SMTP_USER=seu-remetente@dominio.com
+SMTP_PASSWORD=sua-senha-ou-app-password
+EMAIL_FROM=seu-remetente@dominio.com
+EMAIL_FROM_NAME=Toque de Mulher
+EMAIL_CONFIRMATION_REQUIRED=false
 ```
 
 Variaveis principais:
@@ -73,6 +81,11 @@ Variaveis principais:
 - `GOOGLE_CLIENT_ID`: OAuth Client ID web do Google.
 - `VITE_GOOGLE_CLIENT_ID`: fallback aceito pelo backend caso a variavel do frontend tenha sido copiada para o servidor.
 - `CORS_ORIGINS`: origens permitidas, por padrao inclui `http://localhost:5173` e `http://127.0.0.1:5173`.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: credenciais SMTP para envio de e-mails transacionais.
+- `SMTP_STARTTLS`: habilita STARTTLS no SMTP. Padrao: `true`.
+- `EMAIL_FROM`, `EMAIL_FROM_NAME`: remetente exibido nos e-mails.
+- `EMAIL_CONFIRMATION_REQUIRED`: se `true`, login por senha exige e-mail confirmado.
+- `EMAIL_CONFIRMATION_EXPIRE_MINUTES`: validade do token de confirmacao. Padrao: `1440`.
 
 ## Conexão com Supabase
 
@@ -133,9 +146,11 @@ Com uma credencial falsa, a API configurada deve responder:
 Isso indica que o Client ID foi carregado e que apenas o token enviado nao e
 valido.
 
-## Template de confirmacao de e-mail
+## Confirmacao de e-mail
 
-O template de confirmacao do Supabase Auth local/self-hosted esta em:
+O cadastro do backend proprio gera um token de confirmacao, monta uma URL para
+o frontend e envia o e-mail por SMTP. O template HTML usado pelo backend e o
+mesmo template versionado para Supabase Auth local/self-hosted:
 
 ```text
 supabase/templates/confirmation.html
@@ -155,6 +170,18 @@ O template usa HTML de e-mail com estilos inline, logo em lockup tipografico
 `all-round-gothic`, carregada pelo projeto Adobe Fonts
 `https://use.typekit.net/ocs2tdf.css`; clientes de e-mail que bloquearem
 webfonts usam `Poppins`/`Arial` como fallback.
+
+Fluxo ativo:
+
+- `POST /api/v1/user/register` cria o usuario e agenda o envio do e-mail.
+- O link do e-mail aponta para `FRONTEND_URL/confirm-email?token=...`.
+- A pagina `/confirm-email` do frontend chama `POST /api/v1/user/confirm-email`.
+- O backend valida o token e preenche `user.email_confirmed_at`.
+- Se `EMAIL_CONFIRMATION_REQUIRED=true`, `POST /api/v1/user/login` bloqueia usuarios ainda nao confirmados.
+
+Se SMTP nao estiver configurado, o cadastro continua funcionando e o backend
+registra aviso no log. Para e-mails reais, preencha as variaveis SMTP e
+reinicie a API.
 
 Em projeto hosted da Supabase, cole o HTML desse arquivo no Dashboard em
 `Authentication > Email Templates > Confirm signup`. Em projetos free criados

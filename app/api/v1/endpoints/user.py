@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlmodel import select
 
 from app.api.dependencies import CurrentUser, addToDB
 from app.core.db import _SessionDep
+from app.core.time import utc_now
 from app.models.payment import Payment
 from app.models.paymentItem import PaymentItem
 from app.models.product import Product
@@ -18,9 +19,14 @@ from app.schemas.user import (
     ChangeEmailRequest,
     ChangePasswordRequest,
     ChangeUserInformationRequest,
+    ConfirmEmailRequest,
     DeleteAccountRequest,
     GetUserResponse,
     UserRequest,
+)
+from app.services.email_confirmation_service import (
+    send_confirmation_email,
+    verify_email_confirmation_token,
 )
 from app.services.loginService import LoginAndJWT
 
@@ -28,7 +34,11 @@ router = APIRouter(prefix="/user")
 
 
 @router.post("/register", response_model=Message, status_code=201)
-def create_user(user: UserRequest, session: _SessionDep):
+def create_user(
+    user: UserRequest,
+    session: _SessionDep,
+    background_tasks: BackgroundTasks,
+):
     existing_user = session.exec(
         select(UserInDB).where(UserInDB.email == user.email)
     ).first()
@@ -43,7 +53,29 @@ def create_user(user: UserRequest, session: _SessionDep):
     )
 
     addToDB(db_user, session)
-    return Message(mensagem="Usuario criado com sucesso")
+    background_tasks.add_task(send_confirmation_email, db_user.name, db_user.email)
+    return Message(
+        mensagem="Usuario criado com sucesso. Verifique seu email para confirmar a conta."
+    )
+
+
+@router.post("/confirm-email", response_model=Message, status_code=200)
+def confirm_email(payload: ConfirmEmailRequest, session: _SessionDep):
+    email = verify_email_confirmation_token(payload.token)
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Token de confirmacao invalido")
+
+    db_user = session.exec(select(UserInDB).where(UserInDB.email == email)).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+
+    if db_user.email_confirmed_at is None:
+        db_user.email_confirmed_at = utc_now()
+        addToDB(db_user, session)
+
+    return Message(mensagem="Email confirmado com sucesso")
 
 
 @router.get("/me", response_model=GetUserResponse)
@@ -63,6 +95,7 @@ def get_user(session: _SessionDep, user: CurrentUser):
         birth_date=db_user.birth_date,
         accepts_marketing=db_user.accepts_marketing,
         created_at=db_user.created_at.date(),
+        email_confirmed_at=db_user.email_confirmed_at,
         role=db_user.role,
     )
 

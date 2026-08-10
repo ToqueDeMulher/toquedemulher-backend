@@ -1,6 +1,7 @@
 from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime, date
+from sqlalchemy import Column, DateTime
 from sqlmodel import SQLModel, Field, Relationship
 from app.core.time import utc_now
 from app.models.productReview import ProductReview
@@ -26,6 +27,10 @@ class UserInDB(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+    email_confirmed_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
     deleted_at: Optional[datetime] = None
     disabled: bool = Field(default=False)
 

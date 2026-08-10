@@ -47,6 +47,17 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     VITE_GOOGLE_CLIENT_ID: str = ""
 
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_STARTTLS: bool = True
+    EMAIL_FROM: str = "noreply@toquedemulher.com.br"
+    EMAIL_FROM_NAME: str = "Toque de Mulher"
+    EMAIL_CONFIRMATION_REQUIRED: bool = False
+    EMAIL_CONFIRMATION_EXPIRE_MINUTES: int = 1440
+    EMAIL_CONFIRMATION_TEMPLATE_PATH: str = "supabase/templates/confirmation.html"
+
     SUPABASE_PROJECT_REF: str = DEFAULT_SUPABASE_PROJECT_REF
     SUPABASE_DB_PASSWORD: str = ""
     SUPABASE_DB_USER: str = "postgres"
