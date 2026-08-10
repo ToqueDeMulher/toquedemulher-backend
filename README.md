@@ -149,16 +149,10 @@ subject = "Confirm your email address"
 content_path = "./supabase/templates/confirmation.html"
 ```
 
-Conteudo atual:
+O template usa HTML de e-mail com estilos inline, botao principal e link de
+fallback com `{{ .ConfirmationURL }}`.
 
-```html
-<h2>Confirm your email address</h2>
-
-<p>Follow the link below to confirm this email address and finish signing up.</p>
-<p><a href="{{ .ConfirmationURL }}">Confirm email address</a></p>
-```
-
-Em projeto hosted da Supabase, cole o mesmo HTML no Dashboard em
+Em projeto hosted da Supabase, cole o HTML desse arquivo no Dashboard em
 `Authentication > Email Templates > Confirm signup`. Em projetos free criados
 depois de 3 de junho de 2026, a Supabase pode exigir SMTP proprio para
 customizar templates.
