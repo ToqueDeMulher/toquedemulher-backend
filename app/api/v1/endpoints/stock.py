@@ -69,9 +69,9 @@ def add_to_stock(user: AdminUser, stock_info: StockRequest, session: _SessionDep
     
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         session.rollback()
-        raise HTTPException(status_code=500, detail= f"Error {e} ao atualizar o estoque")
+        raise HTTPException(status_code=500, detail="Erro ao atualizar o estoque")
 
 
 @router.get("/")

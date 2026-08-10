@@ -27,7 +27,7 @@ def create_checkout_session(payload, order_id):
         ui_mode="embedded",
         mode="payment",
         line_items=line_items,
-        return_url="http://localhost:3000/checkout/retorno?session_id={CHECKOUT_SESSION_ID}",
+        return_url=f"{settings.FRONTEND_SUCCESS_URL}?session_id={{CHECKOUT_SESSION_ID}}",
         metadata={
             "order_id": str(order_id)
         }

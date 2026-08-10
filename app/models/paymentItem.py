@@ -7,6 +7,8 @@ from app.models.payment import Payment
 from typing import List
 
 class PaymentItem(SQLModel, table=True):
+    __tablename__ = "payment_item"
+
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     product_id: UUID = Field(foreign_key="product.id", index=True)
     payment_id: UUID = Field(foreign_key="payment.id", nullable=False, index=True)
