@@ -3,6 +3,8 @@ Testes de autenticacao da API ativa.
 Execute com: pytest tests/ -v
 """
 import os
+from decimal import Decimal
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,6 +22,11 @@ os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "whsec_test")
 
 from app.core.db import Database  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models.address import Address  # noqa: E402
+from app.models.payment import Payment, PaymentStatus  # noqa: E402
+from app.models.paymentItem import PaymentItem  # noqa: E402
+from app.models.product import Product  # noqa: E402
+from app.models.productReview import ProductReview  # noqa: E402
 
 
 engine = create_engine(
@@ -183,6 +190,7 @@ def test_get_my_profile():
 
     assert response.status_code == 200
     assert response.json()["email"] == "maria@example.com"
+    assert response.json()["created_at"] is not None
 
 
 def test_protected_route_without_token():
@@ -316,3 +324,75 @@ def test_manage_payment_methods_without_storing_sensitive_card_data():
     methods = methods_response.json()
     assert methods[0]["method_type"] == "pix"
     assert len([method for method in methods if method["is_default"]]) == 1
+
+
+def test_profile_orders_and_reviews_come_from_database():
+    token = create_logged_user()
+    headers = {"Authorization": f"Bearer {token}"}
+    profile = client.get("/api/v1/user/me", headers=headers).json()
+    user_id = UUID(profile["id"])
+    order_id = uuid4()
+
+    empty_orders_response = client.get("/api/v1/user/me/orders", headers=headers)
+    empty_reviews_response = client.get("/api/v1/user/me/reviews", headers=headers)
+
+    assert empty_orders_response.status_code == 200
+    assert empty_orders_response.json() == []
+    assert empty_reviews_response.status_code == 200
+    assert empty_reviews_response.json() == []
+
+    with Session(engine) as session:
+        address = Address(
+            user_id=user_id,
+            label="Casa",
+            cep="70000000",
+            street="Rua A",
+            number="10",
+            city="Brasilia",
+            state="DF",
+        )
+        product = Product(slug="batom-real", name="Batom Real", price=49.9)
+        payment = Payment(
+            order_id=order_id,
+            user_id=user_id,
+            address_id=address.id,
+            payer_email=profile["email"],
+            amount=Decimal("99.80"),
+            status=PaymentStatus.APPROVED,
+        )
+        payment_item = PaymentItem(
+            product_id=product.id,
+            payment_id=payment.id,
+            title=product.name,
+            product_url="/produto/batom-real",
+            unit_price=Decimal("49.90"),
+            quantity=2,
+        )
+        review = ProductReview(
+            product_id=product.id,
+            user_id=user_id,
+            rating=5,
+            title="Amei",
+            comment="Produto aprovado.",
+        )
+
+        session.add(address)
+        session.add(product)
+        session.add(payment)
+        session.add(payment_item)
+        session.add(review)
+        session.commit()
+
+    orders_response = client.get("/api/v1/user/me/orders", headers=headers)
+    reviews_response = client.get("/api/v1/user/me/reviews", headers=headers)
+
+    assert orders_response.status_code == 200
+    orders = orders_response.json()
+    assert orders[0]["id"] == str(order_id)
+    assert orders[0]["items_count"] == 2
+    assert orders[0]["items"][0]["title"] == "Batom Real"
+
+    assert reviews_response.status_code == 200
+    reviews = reviews_response.json()
+    assert reviews[0]["product_name"] == "Batom Real"
+    assert reviews[0]["rating"] == 5

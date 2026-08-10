@@ -11,6 +11,7 @@ class GetUserResponse(BaseModel):
     gender: Optional[str] = None
     birth_date: Optional[date] = None
     accepts_marketing: Optional[bool] = None
+    created_at: Optional[date] = None
     role: Optional[str] = None
 
 class UserRequest(BaseModel):

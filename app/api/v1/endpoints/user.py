@@ -3,7 +3,16 @@ from sqlmodel import select
 
 from app.api.dependencies import CurrentUser, addToDB
 from app.core.db import _SessionDep
+from app.models.payment import Payment
+from app.models.paymentItem import PaymentItem
+from app.models.product import Product
+from app.models.productReview import ProductReview
 from app.models.user import UserInDB
+from app.schemas.account import (
+    AccountOrderItemResponse,
+    AccountOrderResponse,
+    AccountReviewResponse,
+)
 from app.schemas.message import Message
 from app.schemas.user import (
     ChangeEmailRequest,
@@ -53,8 +62,71 @@ def get_user(session: _SessionDep, user: CurrentUser):
         gender=db_user.gender,
         birth_date=db_user.birth_date,
         accepts_marketing=db_user.accepts_marketing,
+        created_at=db_user.created_at.date(),
         role=db_user.role,
     )
+
+
+@router.get("/me/orders", response_model=list[AccountOrderResponse])
+def get_my_orders(session: _SessionDep, user: CurrentUser):
+    payments = session.exec(
+        select(Payment)
+        .where(Payment.user_id == user.id)
+        .order_by(Payment.created_at.desc())
+    ).all()
+
+    orders: list[AccountOrderResponse] = []
+    for payment in payments:
+        items = session.exec(
+            select(PaymentItem).where(PaymentItem.payment_id == payment.id)
+        ).all()
+        order_items = [
+            AccountOrderItemResponse(
+                id=str(item.id),
+                title=item.title,
+                quantity=item.quantity,
+                unit_price=float(item.unit_price),
+            )
+            for item in items
+        ]
+        orders.append(
+            AccountOrderResponse(
+                id=str(payment.order_id),
+                order_date=payment.created_at,
+                status=payment.status,
+                total=float(payment.amount),
+                items_count=sum(item.quantity for item in items),
+                items=order_items,
+            )
+        )
+
+    return orders
+
+
+@router.get("/me/reviews", response_model=list[AccountReviewResponse])
+def get_my_reviews(session: _SessionDep, user: CurrentUser):
+    reviews = session.exec(
+        select(ProductReview)
+        .where(ProductReview.user_id == user.id)
+        .order_by(ProductReview.created_at.desc())
+    ).all()
+
+    response: list[AccountReviewResponse] = []
+    for review in reviews:
+        product = session.get(Product, review.product_id)
+        response.append(
+            AccountReviewResponse(
+                id=review.id or 0,
+                product_id=review.product_id,
+                product_name=product.name if product else "Produto removido",
+                rating=review.rating,
+                title=review.title,
+                comment=review.comment,
+                created_at=review.created_at,
+            )
+        )
+
+    return response
 
 
 @router.delete("/me", response_model=Message)
