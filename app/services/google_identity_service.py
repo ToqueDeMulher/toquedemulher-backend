@@ -27,7 +27,9 @@ def _get_jwk_client() -> PyJWKClient:
 
 
 def verify_google_credential(credential: str) -> GoogleIdentity:
-    if not settings.GOOGLE_CLIENT_ID:
+    google_client_id = settings.google_client_id
+
+    if not google_client_id:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Login com Google nao configurado",
@@ -39,7 +41,7 @@ def verify_google_credential(credential: str) -> GoogleIdentity:
             credential,
             signing_key.key,
             algorithms=["RS256"],
-            audience=settings.GOOGLE_CLIENT_ID,
+            audience=google_client_id,
         )
     except (InvalidTokenError, PyJWKClientError, ValueError) as exc:
         raise HTTPException(

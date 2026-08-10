@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     FRONTEND_FAILURE_URL: str = "http://localhost:5173/checkout/failure"
     FRONTEND_URL: str = "http://localhost:5173"
     GOOGLE_CLIENT_ID: str = ""
+    VITE_GOOGLE_CLIENT_ID: str = ""
 
     SUPABASE_PROJECT_REF: str = DEFAULT_SUPABASE_PROJECT_REF
     SUPABASE_DB_PASSWORD: str = ""
@@ -68,6 +69,10 @@ class Settings(BaseSettings):
 
     # Upload
     UPLOAD_DIR: str = "uploads"
+
+    @property
+    def google_client_id(self) -> str:
+        return self.GOOGLE_CLIENT_ID.strip() or self.VITE_GOOGLE_CLIENT_ID.strip()
 
     @property
     def database_url(self) -> str:

@@ -21,6 +21,7 @@ os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test")
 os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "whsec_test")
 
 from app.core.db import Database  # noqa: E402
+from app.core.settings import settings  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.address import Address  # noqa: E402
 from app.models.payment import Payment, PaymentStatus  # noqa: E402
@@ -178,6 +179,13 @@ def test_google_login_creates_user_and_returns_tokens(monkeypatch):
     )
     assert me_response.status_code == 200
     assert me_response.json()["email"] == "google-user@example.com"
+
+
+def test_google_client_id_uses_vite_fallback(monkeypatch):
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "")
+    monkeypatch.setattr(settings, "VITE_GOOGLE_CLIENT_ID", "vite-google-client-id")
+
+    assert settings.google_client_id == "vite-google-client-id"
 
 
 def test_get_my_profile():

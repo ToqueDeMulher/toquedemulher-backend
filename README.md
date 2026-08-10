@@ -58,6 +58,10 @@ Configure no `.env`:
 GOOGLE_CLIENT_ID=seu-client-id.apps.googleusercontent.com
 ```
 
+O backend também aceita `VITE_GOOGLE_CLIENT_ID` como fallback para ambientes
+em que a mesma variável pública do frontend foi usada na configuração do
+servidor.
+
 ## Estrutura do Projeto
 
 ```text
