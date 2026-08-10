@@ -6,7 +6,6 @@ from app.models.user import UserInDB
 from app.schemas.user import ForgotPasswordRequest, Login, Token
 from app.services.loginService import LoginAndJWT
 
-
 router = APIRouter(prefix="/user")
 
 

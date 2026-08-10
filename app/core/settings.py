@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.database_url import (
@@ -7,20 +8,16 @@ from app.core.database_url import (
     resolve_database_url,
 )
 
-# 1. Encontra a pasta raiz do projeto de forma absoluta
-# __file__ é este arquivo (settings.py). Vamos subindo as pastas:
-# .parent (core) -> .parent (app) -> .parent (Projeto Integrador)
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
-# 2. Junta o caminho da raiz com o nome do arquivo .env
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 ENV_FILE_PATH = ROOT_DIR / ".env"
 
+
 class Settings(BaseSettings):
-    # 3. Passamos o caminho absoluto (ENV_FILE_PATH) para o Pydantic
     model_config = SettingsConfigDict(
-        env_file=str(ENV_FILE_PATH), 
+        env_file=str(ENV_FILE_PATH),
         env_file_encoding="utf-8",
-        extra="ignore"  # Ignora variáveis extras no .env que não estejam listadas aqui
+        extra="ignore",
     )
 
     DATABASE_URL: str = ""
@@ -38,13 +35,16 @@ class Settings(BaseSettings):
     )
     API_V1_PREFIX: str = "/api/v1"
 
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    SECRET_KEY: str
-    FRONTEND_SUCCESS_URL: str
-    FRONTEND_PENDING_URL: str
-    FRONTEND_FAILURE_URL: str
+
+    FRONTEND_SUCCESS_URL: str = "http://localhost:5173/checkout/success"
+    FRONTEND_PENDING_URL: str = "http://localhost:5173/checkout/pending"
+    FRONTEND_FAILURE_URL: str = "http://localhost:5173/checkout/failure"
+    FRONTEND_URL: str = "http://localhost:5173"
+
     SUPABASE_PROJECT_REF: str = DEFAULT_SUPABASE_PROJECT_REF
     SUPABASE_DB_PASSWORD: str = ""
     SUPABASE_DB_USER: str = "postgres"
@@ -58,8 +58,15 @@ class Settings(BaseSettings):
     SUPABASE_FOLDER: str = "products"
     SUPABASE_TIMEOUT: float = 20.0
     PRODUCT_IMAGE_MAX_BYTES: int = 5 * 1024 * 1024
-    STRIPE_SECRET_KEY: str
-    STRIPE_WEBHOOK_SECRET: str
+
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+
+    # Mercado Pago (usado por payment_service.py)
+    MERCADOPAGO_ACCESS_TOKEN: str = ""
+
+    # Upload
+    UPLOAD_DIR: str = "uploads"
 
     @property
     def database_url(self) -> str:

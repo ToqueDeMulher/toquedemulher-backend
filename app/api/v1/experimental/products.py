@@ -215,8 +215,8 @@ async def upload_product_image(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado.")
 
     if product_id <= 0:
-	    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de produto inválido.")
-    
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de produto inválido.")
+
     if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato inválido.")
 

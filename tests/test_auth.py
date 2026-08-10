@@ -1,14 +1,16 @@
 """
-Testes de autenticação da API ativa.
+Testes de autenticacao da API ativa.
 Execute com: pytest tests/ -v
 """
 import os
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import SQLModel
+from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel
 
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test_auth.db")
+os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("SECRET_KEY", "test-secret")
 os.environ.setdefault("FRONTEND_SUCCESS_URL", "http://localhost/success")
 os.environ.setdefault("FRONTEND_PENDING_URL", "http://localhost/pending")
@@ -20,13 +22,28 @@ from app.core.db import Database  # noqa: E402
 from app.main import app  # noqa: E402
 
 
+engine = create_engine(
+    "sqlite://",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+
+
+def override_get_db():
+    with Session(engine) as db:
+        yield db
+
+
+app.dependency_overrides[Database.get_session] = override_get_db
+SQLModel.metadata.create_all(bind=engine)
+
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
 def clean_db():
-    SQLModel.metadata.drop_all(Database.engine)
-    SQLModel.metadata.create_all(Database.engine)
+    SQLModel.metadata.drop_all(bind=engine)
+    SQLModel.metadata.create_all(bind=engine)
     yield
 
 

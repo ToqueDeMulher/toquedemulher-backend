@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -8,11 +9,19 @@ from app.api.v1.router import api_router
 from app.core.db import Database
 from app.core.settings import settings
 
-app = FastAPI(title="Toque de Mulher API")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Database.create_db_and_tables()
+    yield
+
+
+app = FastAPI(title="Toque de Mulher API", lifespan=lifespan)
 
 origins = [
     origin.strip()
@@ -29,11 +38,6 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-
-@app.on_event("startup")
-def on_startup():
-    Database.create_db_and_tables()
 
 
 @app.get("/health")

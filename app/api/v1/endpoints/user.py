@@ -15,7 +15,6 @@ from app.schemas.user import (
 )
 from app.services.loginService import LoginAndJWT
 
-
 router = APIRouter(prefix="/user")
 
 
