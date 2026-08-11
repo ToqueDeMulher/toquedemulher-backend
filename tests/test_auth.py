@@ -712,6 +712,14 @@ def test_admin_dashboard_comes_from_database():
             amount=Decimal("39.90"),
             status=PaymentStatus.PENDING,
         )
+        refunded_payment = Payment(
+            order_id=uuid4(),
+            user_id=customer_id,
+            address_id=address.id,
+            payer_email=profile["email"],
+            amount=Decimal("39.90"),
+            status=PaymentStatus.REFUNDED,
+        )
         approved_item = PaymentItem(
             product_id=product.id,
             payment_id=approved_payment.id,
@@ -728,6 +736,14 @@ def test_admin_dashboard_comes_from_database():
             unit_price=Decimal("39.90"),
             quantity=1,
         )
+        refunded_item = PaymentItem(
+            product_id=second_product.id,
+            payment_id=refunded_payment.id,
+            title=second_product.name,
+            product_url="/produto/gloss-real",
+            unit_price=Decimal("39.90"),
+            quantity=1,
+        )
         low_stock = Stock(product_id=product.id, total_quantity=4)
         regular_stock = Stock(product_id=second_product.id, total_quantity=12)
 
@@ -738,8 +754,10 @@ def test_admin_dashboard_comes_from_database():
         session.add(second_product)
         session.add(approved_payment)
         session.add(pending_payment)
+        session.add(refunded_payment)
         session.add(approved_item)
         session.add(pending_item)
+        session.add(refunded_item)
         session.add(low_stock)
         session.add(regular_stock)
         session.commit()
@@ -755,26 +773,47 @@ def test_admin_dashboard_comes_from_database():
     kpis = {kpi["key"]: kpi for kpi in data["kpis"]}
     assert kpis["customers"]["value"] == "1"
     assert kpis["products"]["value"] == "2"
-    assert kpis["orders"]["value"] == "2"
-    assert kpis["revenue"]["value"] == "R$ 149,70"
+    assert kpis["orders"]["value"] == "3"
+    assert kpis["net_sales"]["value"] == "R$ 109,80"
+    assert kpis["average_order_value"]["value"] == "R$ 149,70"
+    assert kpis["items_sold"]["value"] == "3"
     assert kpis["products"]["detail"] == "1 com estoque baixo"
 
-    assert any(month["current_year"] == 149.7 for month in data["monthly_revenue"])
+    overview = data["sales_overview"]
+    assert overview["gross_sales"] == 149.7
+    assert overview["net_sales"] == 109.8
+    assert overview["refunded_sales"] == 39.9
+    assert overview["average_order_value"] == 149.7
+    assert overview["total_orders"] == 3
+    assert overview["paid_orders"] == 1
+    assert overview["refunded_orders"] == 1
+    assert overview["pending_orders"] == 1
+    assert overview["items_sold"] == 3
+
+    assert any(
+        month["current_year"] == 149.7 and month["refunded_total"] == 39.9
+        for month in data["monthly_revenue"]
+    )
 
     statuses = {item["status"]: item for item in data["status_distribution"]}
     assert statuses["approved"]["count"] == 1
     assert statuses["pending"]["count"] == 1
+    assert statuses["refunded"]["count"] == 1
+    assert statuses["approved"]["amount"] == 149.7
 
-    assert data["recent_orders"][0]["customer"] == "Maria Silva"
-    assert data["recent_orders"][0]["items_count"] >= 1
-    assert data["recent_orders"][0]["status"] in {"approved", "pending"}
+    recent_statuses = {order["status"] for order in data["recent_orders"]}
+    assert recent_statuses == {"approved", "pending", "refunded"}
+    assert all(order["customer"] == "Maria Silva" for order in data["recent_orders"])
+    assert all(order["customer_email"] == profile["email"] for order in data["recent_orders"])
 
-    assert data["top_products"] == [
-        {
-            "product_id": top_product_id,
-            "name": "Batom Real",
-            "quantity": 3,
-            "revenue": 149.7,
-            "percent": 100,
-        }
-    ]
+    assert len(data["top_products"]) == 1
+    top_product = data["top_products"][0]
+    assert top_product["product_id"] == top_product_id
+    assert top_product["name"] == "Batom Real"
+    assert top_product["slug"] == "batom-real"
+    assert top_product["quantity"] == 3
+    assert top_product["orders_count"] == 1
+    assert top_product["revenue"] == 149.7
+    assert top_product["average_unit_price"] == 49.9
+    assert top_product["percent"] == 100
+    assert top_product["last_sale_at"] is not None
