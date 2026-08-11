@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     addressRouter,
+    admin,
     login,
     paymentMethodRouter,
     product,
@@ -15,6 +16,7 @@ from app.core.settings import settings
 
 api_router = APIRouter(prefix=settings.API_V1_PREFIX)
 
+api_router.include_router(admin.router)
 api_router.include_router(product.router)
 api_router.include_router(stripeCheckout.router)
 api_router.include_router(user.router)

@@ -28,8 +28,10 @@ from app.models.payment import Payment, PaymentStatus  # noqa: E402
 from app.models.paymentItem import PaymentItem  # noqa: E402
 from app.models.product import Product  # noqa: E402
 from app.models.productReview import ProductReview  # noqa: E402
+from app.models.stock import Stock  # noqa: E402
 from app.models.user import UserInDB  # noqa: E402
 from app.services.email_confirmation_service import create_email_confirmation_token  # noqa: E402
+from app.services.loginService import LoginAndJWT  # noqa: E402
 
 
 engine = create_engine(
@@ -66,6 +68,27 @@ def create_logged_user(email: str = "maria@example.com") -> str:
             "password": "Senha@123",
         },
     )
+    login_response = client.post(
+        "/api/v1/user/login",
+        json={
+            "email": email,
+            "password": "Senha@123",
+        },
+    )
+    return login_response.json()["access_token"]
+
+
+def create_admin_token(email: str = "admin@example.com") -> str:
+    with Session(engine) as session:
+        admin = UserInDB(
+            name="Admin Toque de Mulher",
+            email=email,
+            hashed_password=LoginAndJWT.hashing_password("Senha@123"),
+            role="admin",
+        )
+        session.add(admin)
+        session.commit()
+
     login_response = client.post(
         "/api/v1/user/login",
         json={
@@ -629,3 +652,129 @@ def test_profile_orders_and_reviews_come_from_database():
     reviews = reviews_response.json()
     assert reviews[0]["product_name"] == "Batom Real"
     assert reviews[0]["rating"] == 5
+
+
+def test_admin_dashboard_requires_admin_role():
+    token = create_logged_user()
+
+    response = client.get(
+        "/api/v1/admin/dashboard",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_dashboard_comes_from_database():
+    customer_token = create_logged_user(email="cliente@example.com")
+    customer_headers = {"Authorization": f"Bearer {customer_token}"}
+    profile = client.get("/api/v1/user/me", headers=customer_headers).json()
+    customer_id = UUID(profile["id"])
+    admin_token = create_admin_token()
+
+    with Session(engine) as session:
+        disabled_user = UserInDB(
+            name="Conta Inativa",
+            email="inativa@example.com",
+            hashed_password=LoginAndJWT.hashing_password("Senha@123"),
+            disabled=True,
+        )
+        address = Address(
+            user_id=customer_id,
+            label="Casa",
+            cep="70000000",
+            street="Rua A",
+            number="10",
+            city="Brasilia",
+            state="DF",
+        )
+        product = Product(slug="batom-real", name="Batom Real", price=49.9)
+        inactive_product = Product(
+            slug="produto-inativo",
+            name="Produto Inativo",
+            price=99.9,
+            active=False,
+        )
+        second_product = Product(slug="gloss-real", name="Gloss Real", price=39.9)
+        approved_payment = Payment(
+            order_id=uuid4(),
+            user_id=customer_id,
+            address_id=address.id,
+            payer_email=profile["email"],
+            amount=Decimal("149.70"),
+            status=PaymentStatus.APPROVED,
+        )
+        pending_payment = Payment(
+            order_id=uuid4(),
+            user_id=customer_id,
+            address_id=address.id,
+            payer_email=profile["email"],
+            amount=Decimal("39.90"),
+            status=PaymentStatus.PENDING,
+        )
+        approved_item = PaymentItem(
+            product_id=product.id,
+            payment_id=approved_payment.id,
+            title=product.name,
+            product_url="/produto/batom-real",
+            unit_price=Decimal("49.90"),
+            quantity=3,
+        )
+        pending_item = PaymentItem(
+            product_id=second_product.id,
+            payment_id=pending_payment.id,
+            title=second_product.name,
+            product_url="/produto/gloss-real",
+            unit_price=Decimal("39.90"),
+            quantity=1,
+        )
+        low_stock = Stock(product_id=product.id, total_quantity=4)
+        regular_stock = Stock(product_id=second_product.id, total_quantity=12)
+
+        session.add(disabled_user)
+        session.add(address)
+        session.add(product)
+        session.add(inactive_product)
+        session.add(second_product)
+        session.add(approved_payment)
+        session.add(pending_payment)
+        session.add(approved_item)
+        session.add(pending_item)
+        session.add(low_stock)
+        session.add(regular_stock)
+        session.commit()
+        top_product_id = str(product.id)
+
+    response = client.get(
+        "/api/v1/admin/dashboard",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    kpis = {kpi["key"]: kpi for kpi in data["kpis"]}
+    assert kpis["customers"]["value"] == "1"
+    assert kpis["products"]["value"] == "2"
+    assert kpis["orders"]["value"] == "2"
+    assert kpis["revenue"]["value"] == "R$ 149,70"
+    assert kpis["products"]["detail"] == "1 com estoque baixo"
+
+    assert any(month["current_year"] == 149.7 for month in data["monthly_revenue"])
+
+    statuses = {item["status"]: item for item in data["status_distribution"]}
+    assert statuses["approved"]["count"] == 1
+    assert statuses["pending"]["count"] == 1
+
+    assert data["recent_orders"][0]["customer"] == "Maria Silva"
+    assert data["recent_orders"][0]["items_count"] >= 1
+    assert data["recent_orders"][0]["status"] in {"approved", "pending"}
+
+    assert data["top_products"] == [
+        {
+            "product_id": top_product_id,
+            "name": "Batom Real",
+            "quantity": 3,
+            "revenue": 149.7,
+            "percent": 100,
+        }
+    ]
