@@ -665,6 +665,85 @@ def test_admin_dashboard_requires_admin_role():
     assert response.status_code == 403
 
 
+def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypatch):
+    token = create_logged_user(email="checkout@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    profile = client.get("/api/v1/user/me", headers=headers).json()
+    user_id = UUID(profile["id"])
+    captured_items: list[dict] = []
+
+    class FakeStripeSession:
+        id = "cs_test_checkout"
+        url = "https://checkout.stripe.com/c/pay/cs_test_checkout"
+        client_secret = None
+
+    def fake_create_checkout_session(items, order_id, payer_email=None):
+        captured_items.extend(items)
+        assert payer_email == "checkout@example.com"
+        assert str(order_id)
+        return FakeStripeSession()
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.stripeCheckout.create_checkout_session",
+        fake_create_checkout_session,
+    )
+
+    with Session(engine) as session:
+        address = Address(
+            user_id=user_id,
+            label="Casa",
+            cep="70000000",
+            street="Rua A",
+            number="10",
+            city="Brasilia",
+            state="DF",
+        )
+        product = Product(slug="batom-real", name="Batom Real", price=49.9)
+        session.add(address)
+        session.add(product)
+        session.flush()
+        stock = Stock(product_id=product.id, total_quantity=5)
+        session.add(stock)
+        session.commit()
+        address_id = str(address.id)
+        product_id = str(product.id)
+
+    response = client.post(
+        "/api/v1/payments/checkout",
+        headers=headers,
+        json={
+            "address_id": address_id,
+            "items": [
+                {
+                    "id": product_id,
+                    "name": "Batom Real",
+                    "slug": "batom-real",
+                    "product_url": "/produto/batom-real",
+                    "unit_price": 1,
+                    "quantity": 2,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["checkout_url"] == FakeStripeSession.url
+    assert response.json()["session_id"] == FakeStripeSession.id
+    assert captured_items[0]["unit_price"] == Decimal("49.9")
+
+    with Session(engine) as session:
+        payment = session.exec(select(Payment)).one()
+        item = session.exec(select(PaymentItem)).one()
+        stock = session.exec(select(Stock)).one()
+
+        assert payment.amount == Decimal("99.80")
+        assert payment.provider_session_id == FakeStripeSession.id
+        assert item.product_id == UUID(product_id)
+        assert item.unit_price == Decimal("49.90")
+        assert item.quantity == 2
+        assert stock.total_quantity == 3
+
+
 def test_admin_dashboard_comes_from_database():
     customer_token = create_logged_user(email="cliente@example.com")
     customer_headers = {"Authorization": f"Bearer {customer_token}"}
