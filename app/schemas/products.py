@@ -1,11 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from uuid import UUID
 from app.schemas.supplier_product import SupplierProductRequest
 from typing import List
 
 class ProductRequest(BaseModel):
-    slug: str
+    model_config = ConfigDict(extra="ignore")
+
+    slug: Optional[str] = None
     name: str
     price: float
     active: bool = True

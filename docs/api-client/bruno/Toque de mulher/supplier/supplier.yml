@@ -1,0 +1,25 @@
+info:
+  name: supplier
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: http://127.0.0.1:8000/supplier/
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Distribuidora Beta",
+        "contact": "61999998888",
+        "email": "beta@email.com"
+      }
+  auth:
+    type: bearer
+    token: ""
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

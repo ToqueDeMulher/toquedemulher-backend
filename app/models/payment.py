@@ -1,13 +1,13 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List
-from uuid import UUID, uuid4
-from sqlalchemy import Column, DateTime, Numeric
-from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
- 
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+from typing import List, Optional
+from uuid import UUID, uuid4
+
+from sqlalchemy import Column, DateTime, Numeric
+from sqlmodel import Field, Relationship, SQLModel
+
+from app.core.time import utc_now
 
 class PaymentStatus(str, Enum):
     PENDING   = "pending"
@@ -26,7 +26,7 @@ class Payment(SQLModel, table=True):
     address_id: UUID = Field(foreign_key="address.id", nullable=False, index=True)
     
     provider: str = Field(default="stripe", nullable=False)
-    status: str = Field(default=PaymentStatus.PENDING, nullable=False, index=True)
+    status: str = Field(default=PaymentStatus.PENDING.value, nullable=False, index=True)
     payer_email: str = Field(nullable=False, max_length=255)
     amount: Decimal = Field(sa_column=Column(Numeric(10, 2), nullable=False))
     currency: str = Field(default="BRL", nullable=False, max_length=10)

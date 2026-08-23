@@ -1,7 +1,12 @@
-# Python
+# Environment / secrets
+.env
 .env.*
+*.env
+*.env.*
+.envrc
 !.env.example
-*.pyc
+
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
@@ -14,17 +19,45 @@ build/
 venv/
 .venv/
 env/
+.eggs/
+pip-wheel-metadata/
 
-# Ambiente
-.env
-*.env
+# Tests / coverage / tooling caches
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.tox/
+.nox/
 
-# Banco de dados de teste
+# Local databases
 test.db
+test_*.db
 *.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
 
-# Uploads
-uploads/
+# Runtime files
+*.log
+logs/
+/uploads/
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+supabase/.env.*
+supabase/.env.keys
+supabase/.env.local
+supabase/.env.*.local
 
 # IDE
 .vscode/

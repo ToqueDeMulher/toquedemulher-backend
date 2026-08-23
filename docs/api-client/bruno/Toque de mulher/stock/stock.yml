@@ -1,0 +1,31 @@
+info:
+  name: stock
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://127.0.0.1:8000/stock/
+  body:
+    type: json
+    data: |-
+      {
+        "supplier_name": "Distribuidora Alpha",
+        "items": [
+          {
+            "product_name": "Produto Simples",
+            "quantity": 20,
+            "unit_cost": 25.5,
+            "expiry_date": "2026-12-31"
+          }
+        ]
+      }
+  auth:
+    type: bearer
+    token: ""
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

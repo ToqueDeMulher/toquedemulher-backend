@@ -1,8 +1,9 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr
 
 class GetUserResponse(BaseModel):
+    id: Optional[str] = None
     name: Optional[str] = None
     cpf: Optional[str] = None
     email: EmailStr 
@@ -10,6 +11,9 @@ class GetUserResponse(BaseModel):
     gender: Optional[str] = None
     birth_date: Optional[date] = None
     accepts_marketing: Optional[bool] = None
+    created_at: Optional[date] = None
+    email_confirmed_at: Optional[datetime] = None
+    role: Optional[str] = None
 
 class UserRequest(BaseModel):
     name: str
@@ -33,11 +37,13 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 class DeleteAccountRequest(BaseModel):
-    current_password: str
+    current_password: Optional[str] = None
+    confirm_email: EmailStr
     confirm_text: str
 
 class Token (BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str
 
 class TokenData(BaseModel):
@@ -46,3 +52,15 @@ class TokenData(BaseModel):
 class Login(BaseModel):
     email: EmailStr
     password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class GoogleLoginRequest(BaseModel):
+    credential: str
+
+
+class ConfirmEmailRequest(BaseModel):
+    token: str

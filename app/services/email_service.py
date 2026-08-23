@@ -2,7 +2,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
-from app.core.config import settings
+from app.core.settings import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,9 @@ def send_email(
 
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
             server.ehlo()
-            server.starttls()
+            if settings.SMTP_STARTTLS:
+                server.starttls()
+                server.ehlo()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.sendmail(settings.EMAIL_FROM, to_email, msg.as_string())
 

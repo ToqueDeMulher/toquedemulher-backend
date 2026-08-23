@@ -2,6 +2,30 @@
 
 Backend completo para o e-commerce de beleza e perfumes **O Toque de Mulher**, desenvolvido com **Python + FastAPI** e banco de dados **PostgreSQL**.
 
+## Inicio rapido
+
+Use dois terminais: um para o backend e outro para o frontend.
+
+Terminal do backend:
+
+```bash
+cd toquedemulher-backend
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python scripts/check_supabase_connection.py
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+A API fica em:
+
+- `http://127.0.0.1:8000`
+- `http://127.0.0.1:8000/health`
+- `http://127.0.0.1:8000/docs`
+
+Se o servidor ja estiver rodando e voce alterar o `.env`, reinicie o backend.
+Variaveis de ambiente sao carregadas na inicializacao do processo.
+
 ## Tecnologias
 
 | Tecnologia | Versão | Finalidade |
@@ -29,5 +53,203 @@ Backend completo para o e-commerce de beleza e perfumes **O Toque de Mulher**, d
 - **Emails:** Boas-vindas, confirmação de pedido, envio e redefinição de senha
 - **Admin:** Endpoints protegidos para gestão de produtos, pedidos e usuários
 
+## Configuracao local
+
+Crie um arquivo `.env` na raiz de `toquedemulher-backend`. Nao commite esse
+arquivo.
+
+Exemplo:
+
+```env
+DATABASE_URL=postgresql://postgres.<project-ref>:<senha>@aws-0-ca-central-1.pooler.supabase.com:5432/postgres?sslmode=require
+SECRET_KEY=troque-por-uma-chave-forte
+GOOGLE_CLIENT_ID=seu-client-id.apps.googleusercontent.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_STARTTLS=true
+SMTP_USER=seu-remetente@dominio.com
+SMTP_PASSWORD=sua-senha-ou-app-password
+EMAIL_FROM=seu-remetente@dominio.com
+EMAIL_FROM_NAME=Toque de Mulher
+EMAIL_CONFIRMATION_REQUIRED=false
+```
+
+Variaveis principais:
+
+- `DATABASE_URL`: connection string do Postgres/Supabase.
+- `SECRET_KEY`: chave usada para assinar JWTs.
+- `GOOGLE_CLIENT_ID`: OAuth Client ID web do Google.
+- `VITE_GOOGLE_CLIENT_ID`: fallback aceito pelo backend caso a variavel do frontend tenha sido copiada para o servidor.
+- `CORS_ORIGINS`: origens permitidas, por padrao inclui `http://localhost:5173` e `http://127.0.0.1:5173`.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: credenciais SMTP para envio de e-mails transacionais.
+- `SMTP_STARTTLS`: habilita STARTTLS no SMTP. Padrao: `true`.
+- `EMAIL_FROM`, `EMAIL_FROM_NAME`: remetente exibido nos e-mails.
+- `EMAIL_CONFIRMATION_REQUIRED`: se `true`, login por senha exige e-mail confirmado.
+- `EMAIL_CONFIRMATION_EXPIRE_MINUTES`: validade do token de confirmacao. Padrao: `1440`.
+
+## Conexão com Supabase
+
+O backend usa SQLAlchemy/SQLModel com Postgres. Para apontar para a Supabase,
+crie um `.env` e preencha uma das opções:
+
+- `DATABASE_URL` com a connection string completa do dashboard da Supabase.
+- Ou `SUPABASE_PROJECT_REF` + `SUPABASE_DB_PASSWORD`, para o backend montar a URL direta `db.<project-ref>.supabase.co`.
+
+Use conexão direta para backend persistente com IPv6. Em ambientes IPv4-only,
+use a URL do Supavisor em session mode no `DATABASE_URL`. Se usar Supavisor
+transaction mode na porta `6543`, defina `DB_POOL_MODE=null`.
+
+Para validar sem expor segredos:
+
+```bash
+python scripts/check_supabase_connection.py
+```
+
+Neste projeto a Supabase esta sendo usada como Postgres. A autenticacao atual
+e propria do FastAPI, com usuarios e JWTs do backend. Nao e necessario ativar
+o provider Google em Supabase Auth para o fluxo atual.
+
+## Login com Google
+
+O endpoint `POST /api/v1/user/google` recebe o `credential` emitido pelo
+Google Identity Services, valida o ID token e emite os tokens JWT do backend.
+
+Configure no `.env`:
+
+```env
+GOOGLE_CLIENT_ID=seu-client-id.apps.googleusercontent.com
+```
+
+O backend também aceita `VITE_GOOGLE_CLIENT_ID` como fallback para ambientes
+em que a mesma variável pública do frontend foi usada na configuração do
+servidor.
+
+Nao use `GOOGLE_CLIENT_SECRET` neste fluxo. O frontend usa Google Identity
+Services para obter um ID token, e o backend valida esse token pelo Client ID.
+
+Se a API retornar:
+
+```json
+{"detail": "Login com Google nao configurado"}
+```
+
+entao o processo do backend iniciou sem `GOOGLE_CLIENT_ID` ou
+`VITE_GOOGLE_CLIENT_ID`. Confirme o `.env`, reinicie o backend e, em deploy,
+cadastre a variavel de ambiente no painel da plataforma.
+
+Com uma credencial falsa, a API configurada deve responder:
+
+```json
+{"detail": "Credential do Google invalida"}
+```
+
+Isso indica que o Client ID foi carregado e que apenas o token enviado nao e
+valido.
+
+## Confirmacao de e-mail
+
+O cadastro do backend proprio gera um token de confirmacao, monta uma URL para
+o frontend e envia o e-mail por SMTP. O template HTML usado pelo backend e o
+mesmo template versionado para Supabase Auth local/self-hosted:
+
+```text
+supabase/templates/confirmation.html
+```
+
+Ele e referenciado em `supabase/config.toml`:
+
+```toml
+[auth.email.template.confirmation]
+subject = "Confirm your email address"
+content_path = "./supabase/templates/confirmation.html"
+```
+
+O template usa HTML de e-mail com estilos inline, logo em lockup tipografico
+`toque de mulher`, botao principal e link de fallback com
+`{{ .ConfirmationURL }}`. A fonte principal e a mesma do frontend:
+`all-round-gothic`, carregada pelo projeto Adobe Fonts
+`https://use.typekit.net/ocs2tdf.css`; clientes de e-mail que bloquearem
+webfonts usam `Poppins`/`Arial` como fallback.
+
+Fluxo ativo:
+
+- `POST /api/v1/user/register` cria o usuario e agenda o envio do e-mail.
+- O link do e-mail aponta para `FRONTEND_URL/confirm-email?token=...`.
+- A pagina `/confirm-email` do frontend chama `POST /api/v1/user/confirm-email`.
+- O backend valida o token e preenche `user.email_confirmed_at`.
+- Se `EMAIL_CONFIRMATION_REQUIRED=true`, `POST /api/v1/user/login` bloqueia usuarios ainda nao confirmados.
+
+Se SMTP nao estiver configurado, o cadastro continua funcionando e o backend
+registra aviso no log. Para e-mails reais, preencha as variaveis SMTP e
+reinicie a API.
+
+Em projeto hosted da Supabase, cole o HTML desse arquivo no Dashboard em
+`Authentication > Email Templates > Confirm signup`. Em projetos free criados
+depois de 3 de junho de 2026, a Supabase pode exigir SMTP proprio para
+customizar templates.
+
+## Login e acesso admin
+
+A tela de login nao possui mais botao "entrar como admin" ou "entrar como
+cliente". O login e unico.
+
+O redirecionamento para `/admin` acontece automaticamente quando o usuario
+autenticado tem `role = "admin"` no backend. Usuarios comuns sao enviados para
+o perfil.
+
+## Enderecos e checkout
+
+O frontend consome os endpoints de endereco do backend:
+
+- `GET /api/v1/addresses/`
+- `POST /api/v1/addresses/`
+- `PUT /api/v1/addresses/{address_id}`
+- `DELETE /api/v1/addresses/{address_id}`
+
+No checkout, se o usuario logado ja tiver um endereco salvo, o frontend usa o
+endereco padrao de entrega. Caso contrario, mostra a opcao de adicionar um novo
+endereco e salvar no perfil.
+
+## Testes e verificacao
+
+Rode os testes automatizados:
+
+```bash
+source .venv/bin/activate
+python -m pytest tests/test_auth.py -q
+```
+
+Verifique a API local:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Verifique o Google Login sem usar credencial real:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/user/google \
+  -H "Content-Type: application/json" \
+  -d '{"credential":"fake"}'
+```
+
+Se o backend estiver configurado, a resposta sera `Credential do Google
+invalida`, nao `Login com Google nao configurado`.
+
 ## Estrutura do Projeto
- https://docs.google.com/document/d/1N4774-DWwkNtCF7AEbAsxhwpKiUNp7PtfbrS7IxiDHo/edit?usp=sharing
+
+```text
+app/                 Código da API FastAPI
+app/api/v1/          Rotas HTTP versionadas
+app/api/v1/experimental/ Rotas não registradas, mantidas só como referência
+app/core/            Configuração, segurança, banco e utilitários centrais
+app/models/          Modelos persistidos no banco
+app/schemas/         Schemas de entrada e saída
+app/services/        Regras de negócio e integrações externas
+alembic/             Migrações Alembic legadas
+supabase/            Configuração e migrations usadas pela integração Supabase
+scripts/             Scripts operacionais
+docs/api-client/     Coleções de teste de API, incluindo Bruno
+tests/               Testes automatizados
+static/uploads/      Arquivos servidos localmente em desenvolvimento
+```

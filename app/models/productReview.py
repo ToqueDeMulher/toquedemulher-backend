@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from app.core.db import UserInDB
+    from app.models.user import UserInDB
     from app.models.product import Product
 
 class ProductReview(SQLModel, table=True):

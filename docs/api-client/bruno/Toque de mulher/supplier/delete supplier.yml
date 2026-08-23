@@ -1,0 +1,24 @@
+info:
+  name: delete supplier
+  type: http
+  seq: 4
+
+http:
+  method: DELETE
+  url: http://127.0.0.1:8000/supplier/?supplier_name=Distribuidora Beta
+  params:
+    - name: supplier_name
+      value: Distribuidora Beta
+      type: query
+  body:
+    type: json
+    data: ""
+  auth:
+    type: bearer
+    token: ""
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

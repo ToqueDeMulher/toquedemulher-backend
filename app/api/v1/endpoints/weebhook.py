@@ -12,6 +12,13 @@ router = APIRouter()
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+_EVENT_STATUS_MAP = {
+    "checkout.session.completed": PaymentStatus.APPROVED.value,
+    "payment_intent.payment_failed": PaymentStatus.REJECTED.value,
+    "checkout.session.expired": PaymentStatus.CANCELLED.value,
+    "charge.refunded": PaymentStatus.REFUNDED.value,
+}
+
 
 @router.post("/payments/webhook")
 async def stripe_webhook(request: Request, session: _SessionDep):
@@ -30,23 +37,16 @@ async def stripe_webhook(request: Request, session: _SessionDep):
         )
     except ValueError:
         raise HTTPException(status_code=400, detail="Payload inválido")
-    except stripe.error.SignatureVerificationError:
+    except stripe.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Assinatura do webhook inválida")
 
-    event_type = event["type"] 
+    event_type = event["type"]
     data = event["data"]["object"]
 
-    EVENT_STATUS_MAP = {
-        "checkout.session.completed": PaymentStatus.APPROVED.value,
-        "payment_intent.payment_failed": PaymentStatus.REJECTED.value,
-        "checkout.session.expired": PaymentStatus.CANCELLED.value,
-        "charge.refunded": PaymentStatus.REFUNDED.value,
-    }
-
-    if event_type not in EVENT_STATUS_MAP:
+    if event_type not in _EVENT_STATUS_MAP:
         return {"status": "ignored", "event_type": event_type}
 
-    status = EVENT_STATUS_MAP[event_type]
+    status = _EVENT_STATUS_MAP[event_type]
 
     order_id_raw = data.get("metadata", {}).get("order_id")
     if not order_id_raw:
