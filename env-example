@@ -1,0 +1,13 @@
+DATABASE_URL=[database-url]
+SECRET_KEY=[data-base-key]
+
+GOOGLE_CLIENT_ID=[google-client-id]
+
+SMTP_HOST=[smtp-host]
+SMTP_PORT=[smtp-port]
+SMTP_USER=[smtp-user]
+SMTP_PASSWORD=[smtp-pass-
+SMTP_STARTTLS=[smtp]
+
+EMAIL_FROM=[email-sender]
+EMAIL_FROM_NAME=[email-name]
