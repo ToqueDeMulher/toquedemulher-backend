@@ -30,6 +30,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copia o código da aplicação
 COPY . .
 
+
+
 # Cria pasta de uploads com permissão correta
 RUN mkdir -p /app/static /app/uploads \
     && useradd -m -u 1001 appuser \
