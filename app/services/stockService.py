@@ -28,22 +28,59 @@ class StockService():
 
         return stock
 
-    def decrease_stock_quantity(slug: str, quantity_to_remove: int, session: _SessionDep) -> Stock:
+    @staticmethod
+    def decrease_locked_stock_quantity(
+        product: Product,
+        stock: Stock,
+        quantity_to_remove: int,
+        session: _SessionDep,
+        order_id: UUID | None = None,
+        reason: str = "Saída de estoque",
+    ) -> Stock:
         if quantity_to_remove <= 0:
             raise HTTPException(status_code=400,detail="A quantidade removida deve ser maior que zero")
-
-        product = StockService.get_product_by_slug(slug=slug, session=session)
-        stock = StockService.get_stock_by_product_id(product_id=product.id, session=session)
 
         if stock.total_quantity < quantity_to_remove:
             raise HTTPException(status_code=400,detail=f"Estoque insuficiente para o produto {product.name}")
 
         stock.total_quantity -= quantity_to_remove
+        stock.updated_at = utc_now()
+
+        create_stock_movement(
+            session=session,
+            product_id=product.id,
+            stock_id=stock.id,
+            movement_type=StockMovementType.OUT,
+            quantity=quantity_to_remove,
+            reason=reason,
+            order_id=order_id,
+        )
 
         session.add(stock)
 
         return stock
 
+    @staticmethod
+    def decrease_stock_quantity(
+        slug: str,
+        quantity_to_remove: int,
+        session: _SessionDep,
+        order_id: UUID | None = None,
+        reason: str = "Saída de estoque",
+    ) -> Stock:
+        product = StockService.get_product_by_slug(slug=slug, session=session)
+        stock = StockService.get_stock_by_product_id(product_id=product.id, session=session)
+
+        return StockService.decrease_locked_stock_quantity(
+            product=product,
+            stock=stock,
+            quantity_to_remove=quantity_to_remove,
+            session=session,
+            order_id=order_id,
+            reason=reason,
+        )
+
+    @staticmethod
     def adjust_stock_quantity(slug: str, quantity: int, session: _SessionDep):
         if quantity < 0:
             raise HTTPException(status_code=400,detail="A quantidade não pode ser negativa")

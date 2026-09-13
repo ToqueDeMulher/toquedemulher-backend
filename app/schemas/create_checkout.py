@@ -14,10 +14,20 @@ class CheckoutItem(BaseModel):
 
 class CreateCheckoutRequest(BaseModel):
     address_id: UUID
-    items: List[CheckoutItem]
+    idempotency_key: UUID
+    items: List[CheckoutItem] = Field(min_length=1)
 
 
 class CheckoutResponse(BaseModel):
     checkout_url: str
     session_id: str
+    order_id: UUID
     client_secret: Optional[str] = None
+
+
+class CheckoutStatusResponse(BaseModel):
+    session_id: str
+    order_id: UUID
+    status: str
+    amount: float
+    currency: str

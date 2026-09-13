@@ -11,3 +11,9 @@ SMTP_STARTTLS=[smtp]
 
 EMAIL_FROM=[email-sender]
 EMAIL_FROM_NAME=[email-name]
+
+FRONTEND_SUCCESS_URL=http://localhost:5173/checkout/success
+FRONTEND_FAILURE_URL=http://localhost:5173/checkout/failure
+
+STRIPE_SECRET_KEY=[stripe-secret-key]
+STRIPE_WEBHOOK_SECRET=[stripe-webhook-secret]

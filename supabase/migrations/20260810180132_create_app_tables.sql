@@ -176,6 +176,7 @@ CREATE TABLE IF NOT EXISTS "order" (
 CREATE TABLE IF NOT EXISTS payment (
 	id UUID NOT NULL,
 	order_id UUID NOT NULL,
+	idempotency_key UUID,
 	user_id UUID NOT NULL,
 	address_id UUID NOT NULL,
 	provider VARCHAR NOT NULL,
@@ -260,7 +261,7 @@ CREATE TABLE IF NOT EXISTS ordercouponlink (
 	FOREIGN KEY(coupon_id) REFERENCES coupon (id)
 );
 
-CREATE TABLE IF NOT EXISTS paymentitem (
+CREATE TABLE IF NOT EXISTS payment_item (
 	id UUID NOT NULL,
 	product_id UUID NOT NULL,
 	payment_id UUID NOT NULL,
@@ -351,6 +352,8 @@ CREATE INDEX IF NOT EXISTS ix_payment_id ON payment (id);
 
 CREATE INDEX IF NOT EXISTS ix_payment_order_id ON payment (order_id);
 
+CREATE UNIQUE INDEX IF NOT EXISTS ix_payment_idempotency_key ON payment (idempotency_key);
+
 CREATE INDEX IF NOT EXISTS ix_payment_provider_payment_id ON payment (provider_payment_id);
 
 CREATE INDEX IF NOT EXISTS ix_payment_provider_session_id ON payment (provider_session_id);
@@ -377,11 +380,11 @@ CREATE INDEX IF NOT EXISTS ix_order_item_product_id ON order_item (product_id);
 
 CREATE INDEX IF NOT EXISTS ix_ordercouponlink_coupon_id ON ordercouponlink (coupon_id);
 
-CREATE INDEX IF NOT EXISTS ix_paymentitem_id ON paymentitem (id);
+CREATE INDEX IF NOT EXISTS ix_payment_item_id ON payment_item (id);
 
-CREATE INDEX IF NOT EXISTS ix_paymentitem_payment_id ON paymentitem (payment_id);
+CREATE INDEX IF NOT EXISTS ix_payment_item_payment_id ON payment_item (payment_id);
 
-CREATE INDEX IF NOT EXISTS ix_paymentitem_product_id ON paymentitem (product_id);
+CREATE INDEX IF NOT EXISTS ix_payment_item_product_id ON payment_item (product_id);
 
 CREATE INDEX IF NOT EXISTS ix_stock_batch_product_id ON stock_batch (product_id);
 
@@ -413,6 +416,6 @@ alter table public.stock enable row level security;
 alter table public.supplier_product enable row level security;
 alter table public.order_item enable row level security;
 alter table public.ordercouponlink enable row level security;
-alter table public.paymentitem enable row level security;
+alter table public.payment_item enable row level security;
 alter table public.stock_batch enable row level security;
 alter table public.stock_movement enable row level security;

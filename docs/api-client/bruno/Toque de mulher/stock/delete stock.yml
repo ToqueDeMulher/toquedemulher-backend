@@ -5,7 +5,7 @@ info:
 
 http:
   method: DELETE
-  url: http://127.0.0.1:8000/stock/?slug=perfume-versace-eros-100ml
+  url: "{{baseUrl}}/api/v1/stock/?slug=perfume-versace-eros-100ml"
   params:
     - name: slug
       value: perfume-versace-eros-100ml

@@ -29,6 +29,7 @@ from app.models.paymentItem import PaymentItem  # noqa: E402
 from app.models.product import Product  # noqa: E402
 from app.models.productReview import ProductReview  # noqa: E402
 from app.models.stock import Stock  # noqa: E402
+from app.models.stockMovement import StockMovement, StockMovementType  # noqa: E402
 from app.models.user import UserInDB  # noqa: E402
 from app.services.email_confirmation_service import create_email_confirmation_token  # noqa: E402
 from app.services.loginService import LoginAndJWT  # noqa: E402
@@ -671,16 +672,23 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
     profile = client.get("/api/v1/user/me", headers=headers).json()
     user_id = UUID(profile["id"])
     captured_items: list[dict] = []
+    idempotency_key = str(uuid4())
 
     class FakeStripeSession:
         id = "cs_test_checkout"
         url = "https://checkout.stripe.com/c/pay/cs_test_checkout"
         client_secret = None
 
-    def fake_create_checkout_session(items, order_id, payer_email=None):
+    def fake_create_checkout_session(
+        items,
+        order_id,
+        payer_email=None,
+        idempotency_key=None,
+    ):
         captured_items.extend(items)
         assert payer_email == "checkout@example.com"
         assert str(order_id)
+        assert idempotency_key
         return FakeStripeSession()
 
     monkeypatch.setattr(
@@ -708,33 +716,37 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
         address_id = str(address.id)
         product_id = str(product.id)
 
+    checkout_payload = {
+        "address_id": address_id,
+        "idempotency_key": idempotency_key,
+        "items": [
+            {
+                "id": product_id,
+                "name": "Batom Real",
+                "slug": "batom-real",
+                "product_url": "/produto/batom-real",
+                "unit_price": 1,
+                "quantity": 2,
+            }
+        ],
+    }
     response = client.post(
         "/api/v1/payments/checkout",
         headers=headers,
-        json={
-            "address_id": address_id,
-            "items": [
-                {
-                    "id": product_id,
-                    "name": "Batom Real",
-                    "slug": "batom-real",
-                    "product_url": "/produto/batom-real",
-                    "unit_price": 1,
-                    "quantity": 2,
-                }
-            ],
-        },
+        json=checkout_payload,
     )
 
     assert response.status_code == 200
     assert response.json()["checkout_url"] == FakeStripeSession.url
     assert response.json()["session_id"] == FakeStripeSession.id
+    assert response.json()["order_id"]
     assert captured_items[0]["unit_price"] == Decimal("49.9")
 
     with Session(engine) as session:
         payment = session.exec(select(Payment)).one()
         item = session.exec(select(PaymentItem)).one()
         stock = session.exec(select(Stock)).one()
+        movement = session.exec(select(StockMovement)).one()
 
         assert payment.amount == Decimal("99.80")
         assert payment.provider_session_id == FakeStripeSession.id
@@ -742,6 +754,147 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
         assert item.unit_price == Decimal("49.90")
         assert item.quantity == 2
         assert stock.total_quantity == 3
+        assert movement.movement_type == StockMovementType.OUT
+        assert movement.quantity == 2
+        assert movement.order_id == payment.order_id
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.stripeCheckout.retrieve_checkout_session",
+        lambda session_id: FakeStripeSession(),
+    )
+    duplicate_response = client.post(
+        "/api/v1/payments/checkout",
+        headers=headers,
+        json=checkout_payload,
+    )
+
+    assert duplicate_response.status_code == 200
+    assert duplicate_response.json()["session_id"] == FakeStripeSession.id
+    with Session(engine) as session:
+        assert len(session.exec(select(Payment)).all()) == 1
+        assert len(session.exec(select(StockMovement)).all()) == 1
+        assert session.exec(select(Stock)).one().total_quantity == 3
+
+
+def test_expired_stripe_checkout_releases_stock_only_once(monkeypatch):
+    token = create_logged_user(email="expired-checkout@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    profile = client.get("/api/v1/user/me", headers=headers).json()
+    user_id = UUID(profile["id"])
+    order_id = uuid4()
+    stripe_session_id = "cs_test_expired"
+
+    with Session(engine) as session:
+        address = Address(
+            user_id=user_id,
+            label="Casa",
+            cep="70000000",
+            street="Rua B",
+            number="20",
+            city="Brasilia",
+            state="DF",
+        )
+        product = Product(slug="perfume-real", name="Perfume Real", price=100)
+        session.add(address)
+        session.add(product)
+        session.flush()
+
+        stock = Stock(product_id=product.id, total_quantity=3)
+        payment = Payment(
+            order_id=order_id,
+            idempotency_key=uuid4(),
+            user_id=user_id,
+            address_id=address.id,
+            payer_email=profile["email"],
+            amount=Decimal("200.00"),
+            provider_session_id=stripe_session_id,
+            status=PaymentStatus.PENDING.value,
+        )
+        session.add(stock)
+        session.add(payment)
+        session.flush()
+        session.add(
+            PaymentItem(
+                product_id=product.id,
+                payment_id=payment.id,
+                title=product.name,
+                product_url=f"/produto/{product.slug}",
+                unit_price=Decimal("100.00"),
+                quantity=2,
+            )
+        )
+        session.add(
+            StockMovement(
+                product_id=product.id,
+                stock_id=stock.id,
+                movement_type=StockMovementType.OUT,
+                quantity=2,
+                reason="Reserva de estoque para checkout Stripe",
+                order_id=order_id,
+            )
+        )
+        session.commit()
+
+    pending_response = client.get(
+        f"/api/v1/payments/checkout/{stripe_session_id}",
+        headers=headers,
+    )
+    assert pending_response.status_code == 200
+    assert pending_response.json()["status"] == PaymentStatus.PENDING.value
+
+    event = {
+        "type": "checkout.session.expired",
+        "data": {
+            "object": {
+                "id": stripe_session_id,
+                "metadata": {"order_id": str(order_id)},
+                "payment_intent": None,
+            }
+        },
+    }
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.weebhook.stripe.Webhook.construct_event",
+        lambda **kwargs: event,
+    )
+
+    first_webhook = client.post(
+        "/api/v1/payments/webhook",
+        content=b"{}",
+        headers={"stripe-signature": "test-signature"},
+    )
+    duplicate_webhook = client.post(
+        "/api/v1/payments/webhook",
+        content=b"{}",
+        headers={"stripe-signature": "test-signature"},
+    )
+
+    assert first_webhook.status_code == 200
+    assert first_webhook.json()["payment_status"] == PaymentStatus.CANCELLED.value
+    assert duplicate_webhook.status_code == 200
+    assert duplicate_webhook.json()["duplicate"] is True
+
+    with Session(engine) as session:
+        payment = session.exec(select(Payment)).one()
+        stock = session.exec(select(Stock)).one()
+        movements = session.exec(select(StockMovement)).all()
+        returns = [
+            movement
+            for movement in movements
+            if movement.movement_type == StockMovementType.RETURN
+        ]
+
+        assert payment.status == PaymentStatus.CANCELLED.value
+        assert stock.total_quantity == 5
+        assert len(returns) == 1
+        assert returns[0].quantity == 2
+        assert returns[0].order_id == order_id
+
+    cancelled_response = client.get(
+        f"/api/v1/payments/checkout/{stripe_session_id}",
+        headers=headers,
+    )
+    assert cancelled_response.status_code == 200
+    assert cancelled_response.json()["status"] == PaymentStatus.CANCELLED.value
 
 
 def test_admin_dashboard_comes_from_database():
