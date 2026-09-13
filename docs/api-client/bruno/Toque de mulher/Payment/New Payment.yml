@@ -5,12 +5,13 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/payments/checkout"
+  url: "{{baseUrl}}/api/v1/payments/checkout"
   body:
     type: json
     data: |-
       {
         "address_id": "668e387e-4e91-4cb2-947a-75bee5773e90",
+        "idempotency_key": "f7ef89ce-27dd-4a72-b6ee-d070290799a6",
         "items": [
           {
             "id": "33333333-3333-3333-3333-333333333333",

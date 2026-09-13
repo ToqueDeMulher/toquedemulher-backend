@@ -21,6 +21,12 @@ class Payment(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     order_id: UUID = Field(nullable=False, index=True)
+    idempotency_key: Optional[UUID] = Field(
+        default=None,
+        nullable=True,
+        index=True,
+        unique=True,
+    )
 
     user_id: UUID = Field(foreign_key="user.id", nullable=False, index=True)
     address_id: UUID = Field(foreign_key="address.id", nullable=False, index=True)

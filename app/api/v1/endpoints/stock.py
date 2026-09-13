@@ -98,21 +98,30 @@ def get_stock(session: _SessionDep, user: AdminUser)-> List[GetStock]:
 
 @router.delete("/")
 def delete_stock(slug: str, user: AdminUser, session: _SessionDep):
-
-    # Deleta todo o stock e as levas relacionadas a um produto, portanto precisa de uma mensagem de confirmação de ação no front-end antes de enviar esse request.
     product = StockService.get_product_by_slug(slug, session)
-
     stock = StockService.get_stock_by_product_id(product.id, session)
+    old_quantity = stock.total_quantity
 
-    batches = session.exec(select(StockBatch).where(StockBatch.stock_id == stock.id)).all()
-
-    for batch in batches:
-        session.delete(batch)
-
-    session.delete(stock)
+    stock.total_quantity = 0
+    stock.updated_at = utc_now()
+    create_stock_movement(
+        session=session,
+        product_id=product.id,
+        stock_id=stock.id,
+        movement_type=StockMovementType.ADJUSTMENT,
+        quantity=-old_quantity,
+        reason="Zeramento administrativo de estoque",
+    )
+    session.add(stock)
     session.commit()
+    session.refresh(stock)
 
-    return Message(mensagem=f"Estoque e lotes do produto {product.name} deletado com sucesso")
+    return Message(
+        mensagem=(
+            f"Estoque do produto {product.name} zerado com sucesso; "
+            "lotes e histórico foram preservados"
+        )
+    )
 
 @router.put("/")
 def change_stock(quantity: int, slug: str, user: AdminUser, session: _SessionDep):

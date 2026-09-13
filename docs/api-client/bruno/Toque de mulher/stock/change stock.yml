@@ -5,7 +5,7 @@ info:
 
 http:
   method: PUT
-  url: http://127.0.0.1:8000/stock/?slug=produto-simples&quantity=40
+  url: "{{baseUrl}}/api/v1/stock/?slug=produto-simples&quantity=40"
   params:
     - name: slug
       value: produto-simples
