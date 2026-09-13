@@ -10,6 +10,7 @@ from app.api.dependencies import AdminUser, _SessionDep
 from app.core.db import Database
 from app.models.product import Product
 from app.models.productImage import ProductImage
+from app.models.stock import Stock
 from app.schemas.product_images import ProductImageResponse
 from app.schemas.products import ProductRequest
 from app.services.service import generate_unique_slug, upload_to_supabase
@@ -46,6 +47,7 @@ def create_product(payload: ProductRequest, session: _SessionDep, user: AdminUse
         product = Product(**product_data)
         session.add(product)
         session.flush()
+        session.add(Stock(product_id=product.id, total_quantity=0))
 
         if payload.supplier_products:
             upsert_supplier_products(

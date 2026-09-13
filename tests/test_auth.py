@@ -12,7 +12,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, select
 
-os.environ.setdefault("DATABASE_URL", "sqlite://")
+# Unit tests always use an isolated database and disable real SMTP delivery.
+os.environ["DATABASE_URL"] = "sqlite://"
+os.environ["SMTP_USER"] = ""
+os.environ["SMTP_PASSWORD"] = ""
 os.environ.setdefault("SECRET_KEY", "test-secret")
 os.environ.setdefault("FRONTEND_SUCCESS_URL", "http://localhost/success")
 os.environ.setdefault("FRONTEND_PENDING_URL", "http://localhost/pending")
@@ -1049,3 +1052,71 @@ def test_admin_dashboard_comes_from_database():
     assert top_product["average_unit_price"] == 49.9
     assert top_product["percent"] == 100
     assert top_product["last_sale_at"] is not None
+
+
+@pytest.mark.parametrize("default_flag", ["is_default_shipping", "is_default_billing"])
+def test_switch_default_address_with_lower_id(default_flag):
+    token = create_logged_user()
+    headers = {"Authorization": f"Bearer {token}"}
+    user_id = UUID(client.get("/api/v1/user/me", headers=headers).json()["id"])
+    target_id = UUID("00000000-0000-0000-0000-000000000001")
+    old_id = UUID("00000000-0000-0000-0000-000000000002")
+    with Session(engine) as session:
+        for address_id in (target_id, old_id):
+            session.add(Address(id=address_id, user_id=user_id, cep="70000000",
+                                street="Rua A", city="Brasilia", state="DF",
+                                **{default_flag: address_id == old_id}))
+        session.commit()
+    response = client.put(f"/api/v1/addresses/{target_id}", headers=headers,
+                          json={default_flag: True})
+    assert response.status_code == 200
+    defaults = [a for a in client.get("/api/v1/addresses/", headers=headers).json()
+                if a[default_flag]]
+    assert [a["id"] for a in defaults] == [str(target_id)]
+
+
+def test_switch_default_payment_method_with_lower_id():
+    from app.models.userPaymentMethod import UserPaymentMethod
+    token = create_logged_user()
+    headers = {"Authorization": f"Bearer {token}"}
+    user_id = UUID(client.get("/api/v1/user/me", headers=headers).json()["id"])
+    target_id = UUID("00000000-0000-0000-0000-000000000001")
+    old_id = UUID("00000000-0000-0000-0000-000000000002")
+    with Session(engine) as session:
+        session.add(UserPaymentMethod(id=target_id, user_id=user_id, method_type="pix"))
+        session.add(UserPaymentMethod(id=old_id, user_id=user_id, method_type="pix", is_default=True))
+        session.commit()
+    response = client.put(f"/api/v1/payment-methods/{target_id}", headers=headers,
+                          json={"is_default": True})
+    assert response.status_code == 200
+    defaults = [m for m in client.get("/api/v1/payment-methods/", headers=headers).json()
+                if m["is_default"]]
+    assert [m["id"] for m in defaults] == [str(target_id)]
+
+
+def test_create_product_initializes_zero_stock():
+    token = create_admin_token()
+    response = client.post("/api/v1/products", headers={"Authorization": f"Bearer {token}"},
+                           json={"name": "Perfume Novo", "price": 99.9})
+    assert response.status_code == 200
+    product_id = UUID(response.json()["id"])
+    with Session(engine) as session:
+        stock = session.exec(select(Stock).where(Stock.product_id == product_id)).one()
+        assert stock.total_quantity == 0
+
+
+@pytest.mark.parametrize("invalid_field", ["supplier_price", "lead_time_days"])
+@pytest.mark.parametrize("route", ["/api/v1/products", "/api/v1/suppliersProducts"])
+def test_negative_supplier_values_are_rejected_before_database_writes(invalid_field, route):
+    token = create_admin_token()
+    relation = {"supplier_price": 10, "lead_time_days": 1, invalid_field: -1}
+    if route == "/api/v1/products":
+        relation["supplier_name"] = "Fornecedor"
+        payload = {"name": "Produto Invalido", "price": 99.9, "supplier_products": [relation]}
+    else:
+        relation["product_name"] = "Produto Invalido"
+        payload = {"supplier_name": "Fornecedor", "products_list": [relation]}
+    response = client.post(route, headers={"Authorization": f"Bearer {token}"}, json=payload)
+    assert response.status_code == 422
+    with Session(engine) as session:
+        assert session.exec(select(Product)).all() == []

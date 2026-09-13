@@ -8,7 +8,7 @@ from app.core.time import utc_now
 class Cart(SQLModel, table=True):
     __tablename__ = "cart"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
     user_id: UUID = Field(foreign_key="user.id", index=True)
 
     status: str = Field(default="ativo")

@@ -15,7 +15,7 @@ class Product(SQLModel, table=True):
         CheckConstraint("price >= 0", name="ck_product_price_non_negative"),
     )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
 
     slug: str = Field(index=True, unique=True)
     name: str = Field(index=True, unique=True)

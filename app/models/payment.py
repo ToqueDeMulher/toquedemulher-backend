@@ -4,7 +4,7 @@ from enum import Enum
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, DateTime, Numeric
+from sqlalchemy import Column, DateTime, Numeric, CheckConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.time import utc_now
@@ -18,8 +18,11 @@ class PaymentStatus(str, Enum):
 
 class Payment(SQLModel, table=True):
     __tablename__ = "payment"
+    __table_args__ = (
+        CheckConstraint('amount >= 0', name='ck_payment_amount_non_negative'),
+    )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
     order_id: UUID = Field(nullable=False, index=True)
     idempotency_key: Optional[UUID] = Field(
         default=None,

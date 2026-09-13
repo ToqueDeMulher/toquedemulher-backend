@@ -1,11 +1,16 @@
 from typing import  Optional
 from uuid import UUID, uuid4
 from datetime import datetime, date
+from sqlalchemy import CheckConstraint
 from sqlmodel import SQLModel, Field, Relationship
 from app.core.time import utc_now
 
 class StockBatch(SQLModel, table=True):
     __tablename__ = "stock_batch"
+    __table_args__ = (
+        CheckConstraint('quantity >= 0', name='ck_stock_batch_quantity_non_negative'),
+        CheckConstraint('unit_cost >= 0', name='ck_stock_batch_unit_cost_non_negative'),
+    )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
 

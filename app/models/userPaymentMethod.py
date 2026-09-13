@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint
+from sqlalchemy import CheckConstraint, Index, text
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.time import utc_now
@@ -12,6 +12,8 @@ from app.models.user import UserInDB
 class UserPaymentMethod(SQLModel, table=True):
     __tablename__ = "user_payment_method"
     __table_args__ = (
+        Index("ix_user_payment_method_single_default", "user_id", unique=True,
+              postgresql_where=text("is_default"), sqlite_where=text("is_default")),
         CheckConstraint(
             "method_type IN ('card', 'pix', 'boleto')",
             name="ck_user_payment_method_type",

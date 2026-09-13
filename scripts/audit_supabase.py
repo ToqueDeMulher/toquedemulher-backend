@@ -46,7 +46,9 @@ def expected_objects() -> list[dict[str, str]]:
             objects.append(dict(
                 kind="index", table_name=table.name, name=index.name,
                 detail=json.dumps({"columns": [c.name for c in index.columns],
-                                   "unique": index.unique}),
+                                   "unique": index.unique,
+                                   "predicate": str(index.dialect_options["postgresql"]["where"])
+                                       if index.dialect_options["postgresql"]["where"] is not None else None}),
             ))
         objects.append(dict(kind="primary_key", table_name=table.name, name="",
                             detail=json.dumps([c.name for c in table.primary_key.columns])))
@@ -82,7 +84,7 @@ WITH expected AS (
     FROM tables t JOIN pg_attribute a ON a.attrelid = t.oid
     WHERE a.attnum > 0 AND NOT a.attisdropped
 ), constraints AS (
-    SELECT t.name AS table_name, c.conname AS name, c.contype,
+    SELECT t.name AS table_name, c.conname AS name, c.contype, c.convalidated AS validated,
            to_jsonb(ARRAY(SELECT a.attname::text FROM unnest(c.conkey)
                          WITH ORDINALITY k(num, pos)
                          JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.num
@@ -97,7 +99,7 @@ WITH expected AS (
     LEFT JOIN pg_namespace ns ON ns.oid = target.relnamespace
 ), indexes AS (
     SELECT t.name AS table_name, idx.relname AS name, i.indisunique, i.indisvalid,
-           i.indpred IS NULL AS unfiltered,
+           pg_get_expr(i.indpred, i.indrelid) AS predicate,
            to_jsonb(ARRAY(SELECT a.attname::text FROM unnest(i.indkey::smallint[])
                          WITH ORDINALITY k(num, pos)
                          JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.num
@@ -108,6 +110,13 @@ WITH expected AS (
     SELECT 'missing_table' AS issue, e.table_name, e.name, e.detail
     FROM expected e WHERE e.kind = 'table'
       AND NOT EXISTS (SELECT 1 FROM tables t WHERE t.name = e.table_name)
+    UNION ALL
+    SELECT 'unexpected_public_table', t.name, '', ''
+    FROM tables t WHERE NOT EXISTS (
+        SELECT 1 FROM expected e WHERE e.kind = 'table' AND e.table_name = t.name)
+    UNION ALL
+    SELECT 'unvalidated_constraint', c.table_name, c.name, ''
+    FROM constraints c WHERE c.contype IN ('c', 'f') AND NOT c.validated
     UNION ALL
     SELECT 'rls_disabled', e.table_name, e.name, e.detail
     FROM expected e JOIN tables t ON t.name = e.table_name
@@ -140,7 +149,9 @@ WITH expected AS (
     FROM expected e JOIN tables t ON t.name = e.table_name
     WHERE e.kind = 'index' AND NOT EXISTS (
         SELECT 1 FROM indexes i WHERE i.table_name = e.table_name AND i.indisvalid
-          AND i.columns = e.detail::jsonb->'columns' AND i.unfiltered
+          AND i.columns = e.detail::jsonb->'columns'
+          AND regexp_replace(lower(coalesce(i.predicate, '')), '\\s|[()]', '', 'g')
+              = regexp_replace(lower(coalesce(e.detail::jsonb->>'predicate', '')), '\\s|[()]', '', 'g')
           AND (NOT (e.detail::jsonb->>'unique')::boolean OR i.indisunique))
     UNION ALL
     SELECT 'missing_primary_key', e.table_name, e.name, e.detail

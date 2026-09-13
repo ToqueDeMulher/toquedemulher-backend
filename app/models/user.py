@@ -14,7 +14,7 @@ class UserRole(str, Enum):
 class UserInDB(SQLModel, table=True):
     __tablename__ = "user"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
     name: str
     cpf: Optional[str] = None
     email: str = Field(index=True, unique=True)

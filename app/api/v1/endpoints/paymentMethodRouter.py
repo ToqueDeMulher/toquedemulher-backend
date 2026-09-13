@@ -13,11 +13,13 @@ from app.schemas.payment_methods import (
     UserPaymentMethodOut,
     UserPaymentMethodUpdate,
 )
+from app.services.defaults import lock_user_defaults
 
 router = APIRouter(prefix="/payment-methods")
 
 
 def _unset_default_payment_methods(session: _SessionDep, user_id: UUID) -> None:
+    lock_user_defaults(session, user_id)
     methods = session.exec(
         select(UserPaymentMethod).where(
             UserPaymentMethod.user_id == user_id,
@@ -29,6 +31,7 @@ def _unset_default_payment_methods(session: _SessionDep, user_id: UUID) -> None:
         method.is_default = False
         method.updated_at = datetime.now(timezone.utc)
         session.add(method)
+    session.flush()
 
 
 def _clear_card_fields_for_non_card(method: UserPaymentMethod) -> None:
@@ -103,6 +106,7 @@ def update_payment_method(
     session: _SessionDep,
     user: CurrentUser,
 ):
+    lock_user_defaults(session, user.id)
     method = session.exec(
         select(UserPaymentMethod).where(
             UserPaymentMethod.id == payment_method_id,
@@ -117,14 +121,17 @@ def update_payment_method(
     if "method_type" in update_data and update_data["method_type"] is not None:
         update_data["method_type"] = update_data["method_type"].value
 
+    becomes_default = update_data.get("is_default", method.is_default)
+    if becomes_default:
+        _unset_default_payment_methods(session, user.id)
+
     for key, value in update_data.items():
         setattr(method, key, value)
 
     _clear_card_fields_for_non_card(method)
     _validate_payment_method_state(method)
 
-    if method.is_default:
-        _unset_default_payment_methods(session, user.id)
+    if becomes_default:
         method.is_default = True
 
     method.updated_at = datetime.now(timezone.utc)

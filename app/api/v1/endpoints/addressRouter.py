@@ -9,6 +9,7 @@ from app.core.db import _SessionDep
 from app.models.address import Address
 from app.schemas.addresses import AddressChangeRequest, AddressRequest
 from app.schemas.message import Message
+from app.services.defaults import lock_user_defaults
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,8 @@ router = APIRouter(prefix="/addresses")
 @router.post("/", response_model=Message, status_code=201)
 def create_address(address_data: AddressRequest, session: _SessionDep, user: CurrentUser):
     try:
+        if address_data.is_default_shipping or address_data.is_default_billing:
+            lock_user_defaults(session, user.id)
         if address_data.is_default_shipping:
             _unset_default_shipping_addresses(session, user.id)
         if address_data.is_default_billing:
@@ -69,6 +72,10 @@ def update_address(
     session: _SessionDep,
     user: CurrentUser,
 ):
+    update_data = data.model_dump(exclude_unset=True)
+    if update_data.get("is_default_shipping") or update_data.get("is_default_billing"):
+        lock_user_defaults(session, user.id)
+
     # user já foi validado pelo CurrentUser — busca direta do endereço
     address = session.exec(
         select(Address).where(
@@ -83,7 +90,6 @@ def update_address(
             detail="Endereço não encontrado ou não pertence ao usuário",
         )
 
-    update_data = data.model_dump(exclude_unset=True)
     if update_data.get("is_default_shipping"):
         _unset_default_shipping_addresses(session, user.id)
     if update_data.get("is_default_billing"):
@@ -113,6 +119,7 @@ def _unset_default_shipping_addresses(session: _SessionDep, user_id: UUID) -> No
     for address in addresses:
         address.is_default_shipping = False
         session.add(address)
+    session.flush()
 
 
 def _unset_default_billing_addresses(session: _SessionDep, user_id: UUID) -> None:
@@ -126,3 +133,4 @@ def _unset_default_billing_addresses(session: _SessionDep, user_id: UUID) -> Non
     for address in addresses:
         address.is_default_billing = False
         session.add(address)
+    session.flush()

@@ -1,11 +1,16 @@
 from typing import  Optional
 from uuid import UUID, uuid4
 from datetime import datetime
+from sqlalchemy import CheckConstraint
 from sqlmodel import SQLModel, Field, Relationship
 from app.core.time import utc_now
 
 class SupplierProduct(SQLModel, table=True):
     __tablename__ = "supplier_product"
+    __table_args__ = (
+        CheckConstraint('supplier_price >= 0', name='ck_supplier_product_price_non_negative'),
+        CheckConstraint('lead_time_days IS NULL OR lead_time_days >= 0', name='ck_supplier_product_lead_time_non_negative'),
+    )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
 
