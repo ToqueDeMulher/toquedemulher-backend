@@ -100,6 +100,7 @@ def create_product(payload: ProductRequest, session: _SessionDep, user: AdminUse
 )
 async def upload_product_image(
     product_id: UUID,
+    user: AdminUser,
     file: UploadFile = File(...),
     order: Optional[int] = Form(None),
     alt_text: Optional[str] = Form(None),
@@ -145,7 +146,7 @@ async def upload_product_image(
         session.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"Erro interno: {exc}",
+            detail="Erro interno ao salvar a imagem.",
         ) from exc
 
     return ProductImageResponse(
@@ -154,5 +155,5 @@ async def upload_product_image(
         alt_text=image.alt_text,
         order=image.order,
         sort_order=image.order,
-        is_primary=False,
+        is_primary=image.order == 1,
     )

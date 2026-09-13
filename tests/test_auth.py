@@ -1120,3 +1120,39 @@ def test_negative_supplier_values_are_rejected_before_database_writes(invalid_fi
     assert response.status_code == 422
     with Session(engine) as session:
         assert session.exec(select(Product)).all() == []
+
+
+@pytest.mark.parametrize("role", ["anonymous", "customer"])
+def test_image_upload_requires_admin_before_storage(role, monkeypatch):
+    async def unexpected_upload(**kwargs):
+        pytest.fail("Unauthorized upload reached Storage")
+    monkeypatch.setattr("app.api.v1.endpoints.product.upload_to_supabase", unexpected_upload)
+    headers = {} if role == "anonymous" else {"Authorization": f"Bearer {create_logged_user()}"}
+    response = client.post(
+        f"/api/v1/products/{uuid4()}/images", headers=headers,
+        files={"file": ("image.png", b"fixture", "image/png")},
+    )
+    assert response.status_code in (401, 403)
+
+
+def test_admin_upload_persists_image_for_product_uuid(monkeypatch):
+    from app.models.productImage import ProductImage
+    token = create_admin_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    product_id = client.post("/api/v1/products", headers=headers,
+                             json={"name": "Produto com foto", "price": 10}).json()["id"]
+    async def fake_upload(**kwargs):
+        assert str(kwargs["product_id"]) == product_id
+        assert kwargs["extension"] == ".png"
+        return "https://example.com/product.png"
+    monkeypatch.setattr("app.api.v1.endpoints.product.upload_to_supabase", fake_upload)
+    response = client.post(f"/api/v1/products/{product_id}/images", headers=headers,
+                           files={"file": ("image.png", b"fixture", "image/png")},
+                           data={"alt_text": "Foto do produto", "order": "1"})
+    assert response.status_code == 200
+    assert response.json()["is_primary"] is True
+    with Session(engine) as session:
+        image = session.exec(select(ProductImage)).one()
+        assert str(image.product_id) == product_id
+        assert image.alt_text == "Foto do produto"
+        assert image.url == response.json()["url"]
