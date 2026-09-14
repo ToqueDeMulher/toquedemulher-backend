@@ -20,6 +20,7 @@ class UserInDB(SQLModel, table=True):
     email: str = Field(index=True, unique=True)
     hashed_password: str
     phone: Optional[str] = None
+    avatar_url: Optional[str] = None
 
     gender: Optional[str] = None
     birth_date: Optional[date] = None

@@ -14,6 +14,7 @@ class GetUserResponse(BaseModel):
     created_at: Optional[date] = None
     email_confirmed_at: Optional[datetime] = None
     role: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class UserRequest(BaseModel):
     name: str
@@ -56,6 +57,11 @@ class Login(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
 
 
 class GoogleLoginRequest(BaseModel):
