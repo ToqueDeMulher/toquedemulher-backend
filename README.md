@@ -80,7 +80,7 @@ Variaveis principais:
 - `SECRET_KEY`: chave usada para assinar JWTs.
 - `GOOGLE_CLIENT_ID`: OAuth Client ID web do Google.
 - `VITE_GOOGLE_CLIENT_ID`: fallback aceito pelo backend caso a variavel do frontend tenha sido copiada para o servidor.
-- `CORS_ORIGINS`: origens permitidas, por padrao inclui `http://localhost:5173` e `http://127.0.0.1:5173`.
+- `CORS_ORIGINS`: origens permitidas, por padrao inclui `localhost` e `127.0.0.1` nas portas `3000`, `3001` e `5173`. A porta `3001` permite executar o Vite quando a `3000` ja esta ocupada. Se definir essa variavel, informe todas as origens que devem ser aceitas, separadas por virgula.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: credenciais SMTP para envio de e-mails transacionais.
 - `SMTP_STARTTLS`: habilita STARTTLS no SMTP. Padrao: `true`.
 - `EMAIL_FROM`, `EMAIL_FROM_NAME`: remetente exibido nos e-mails.

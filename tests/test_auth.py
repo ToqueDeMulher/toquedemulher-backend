@@ -107,6 +107,48 @@ def test_health_check():
     assert response.json()["status"] == "ok"
 
 
+@pytest.mark.parametrize("path", ["/api/v1/user/login", "/api/v1/user/register"])
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+)
+def test_auth_preflight_accepts_frontend_origins(path, origin):
+    response = client.options(
+        path,
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,authorization",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+    assert "POST" in response.headers["access-control-allow-methods"]
+
+
+@pytest.mark.parametrize("path", ["/api/v1/user/login", "/api/v1/user/register"])
+def test_auth_preflight_rejects_unlisted_origin(path):
+    response = client.options(
+        path,
+        headers={
+            "Origin": "https://untrusted.example",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
+
+
 def test_register_user():
     response = client.post(
         "/api/v1/user/register",
