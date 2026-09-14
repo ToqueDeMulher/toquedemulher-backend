@@ -27,6 +27,7 @@ from app.services.checkoutService import (
 )
 from app.services.paymentStockService import release_checkout_stock
 from app.services.stockService import StockService
+from app.services import melhor_envio as shipping_service
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,9 @@ def _resolve_product(item, session: Session) -> Product | None:
 
 
 @router.post("/checkout", response_model=CheckoutResponse)
-def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: CurrentUser):
+def create_checkout(
+    payload: CreateCheckoutRequest, session: _SessionDep, user: CurrentUser
+):
     """Cria uma sessão de checkout Stripe com reserva atômica de estoque."""
 
     if not settings.STRIPE_SECRET_KEY.strip():
@@ -114,7 +117,9 @@ def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: 
     ).first()
     if existing_payment:
         if existing_payment.user_id != user.id:
-            raise HTTPException(status_code=409, detail="Chave de checkout já utilizada")
+            raise HTTPException(
+                status_code=409, detail="Chave de checkout já utilizada"
+            )
         return _existing_checkout_response(existing_payment)
 
     total_amount = Decimal("0")
@@ -138,6 +143,11 @@ def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: 
                     status_code=404,
                     detail="Endereço não encontrado ou não pertence ao usuário",
                 )
+
+            quote, shipping_option = shipping_service.validate_selection(
+                payload.shipping, payload.items, address, session
+            )
+            total_amount += Decimal(str(shipping_option["price"]))
 
             # Valida produtos e reserva estoque (SELECT FOR UPDATE evita overselling)
             for item in payload.items:
@@ -164,7 +174,7 @@ def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: 
                         detail=f"Estoque insuficiente para '{product.name}'",
                     )
 
-                unit_price = Decimal(str(product.price))
+                unit_price = Decimal(str(product.price)).quantize(Decimal("0.01"))
                 total_amount += unit_price * item.quantity
                 StockService.decrease_locked_stock_quantity(
                     product=product,
@@ -190,6 +200,8 @@ def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: 
                 order_id,
                 payer_email=user.email,
                 idempotency_key=str(payload.idempotency_key),
+                shipping_amount=Decimal(str(shipping_option["price"])),
+                shipping_name=f"{shipping_option['company']} - {shipping_option['name']}",
             )
             checkout_url = _stripe_value(stripe_session, "url")
             stripe_session_id = _stripe_value(stripe_session, "id")
@@ -211,6 +223,11 @@ def create_checkout(payload: CreateCheckoutRequest, session: _SessionDep, user: 
             )
             session.add(payment)
             session.flush()
+            session.add(
+                shipping_service.new_shipment(
+                    payment, quote, shipping_option, payload.shipping, address
+                )
+            )
 
             for item in verified_items:
                 session.add(

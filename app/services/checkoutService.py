@@ -16,6 +16,8 @@ def create_checkout_session(
     order_id,
     payer_email: str | None = None,
     idempotency_key: str | None = None,
+    shipping_amount: Decimal = Decimal("0"),
+    shipping_name: str = "Frete",
 ):
     line_items = []
 
@@ -30,6 +32,18 @@ def create_checkout_session(
                     "unit_amount": _to_cents(item["unit_price"]),
                 },
                 "quantity": item["quantity"],
+            }
+        )
+
+    if shipping_amount > 0:
+        line_items.append(
+            {
+                "price_data": {
+                    "currency": "brl",
+                    "product_data": {"name": shipping_name},
+                    "unit_amount": _to_cents(shipping_amount),
+                },
+                "quantity": 1,
             }
         )
 

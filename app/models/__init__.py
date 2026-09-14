@@ -51,3 +51,5 @@ __all__ = [
     "Supplier",
     "SupplierProduct",
 ]
+
+from app.models.shipping import ShippingConnection, ShippingQuote, Shipment

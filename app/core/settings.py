@@ -80,6 +80,18 @@ class Settings(BaseSettings):
     # Mercado Pago (usado por payment_service.py)
     MERCADOPAGO_ACCESS_TOKEN: str = ""
 
+    # Melhor Envio: secrets remain exclusively on the backend.
+    MELHOR_ENVIO_ENVIRONMENT: str = "sandbox"
+    MELHOR_ENVIO_CLIENT_ID: str = ""
+    MELHOR_ENVIO_CLIENT_SECRET: str = ""
+    MELHOR_ENVIO_REDIRECT_URI: str = "http://localhost:8000/api/v1/shipping/oauth/callback"
+    MELHOR_ENVIO_USER_AGENT: str = ""
+    MELHOR_ENVIO_SENDER: str = "{}"
+    MELHOR_ENVIO_SERVICES: str = "1,2,3,4"
+    MELHOR_ENVIO_TIMEOUT: float = 10.0
+    MELHOR_ENVIO_QUOTE_TTL_MINUTES: int = 15
+    MELHOR_ENVIO_FREE_SHIPPING_THRESHOLD: float = 150.0
+
     # Upload
     UPLOAD_DIR: str = "uploads"
 

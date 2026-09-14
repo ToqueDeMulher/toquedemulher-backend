@@ -253,3 +253,13 @@ docs/api-client/     Coleções de teste de API, incluindo Bruno
 tests/               Testes automatizados
 static/uploads/      Arquivos servidos localmente em desenvolvimento
 ```
+
+## Fretes: Melhor Envio e BrasilAPI
+
+O carrinho e o Stripe Checkout usam cotações reais do Melhor Envio. O painel
+`/admin/envios` conecta a conta por OAuth e permite preparar, pagar, gerar,
+imprimir e acompanhar etiquetas. A BrasilAPI preenche os endereços por CEP.
+
+Consulte [ativação e operação da integração](docs/shipping-integration.md) para
+aplicar a migração, configurar as credenciais do backend, remetente, medidas dos
+produtos e homologar o fluxo no Sandbox.

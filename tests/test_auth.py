@@ -726,10 +726,14 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
         order_id,
         payer_email=None,
         idempotency_key=None,
+        shipping_amount=Decimal("0"),
+        shipping_name="Frete",
     ):
         captured_items.extend(items)
         assert payer_email == "checkout@example.com"
         assert str(order_id)
+        assert shipping_amount == Decimal("18.60")
+        assert "Jadlog" in shipping_name
         assert idempotency_key
         return FakeStripeSession()
 
@@ -758,8 +762,82 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
         address_id = str(address.id)
         product_id = str(product.id)
 
+    from app.models.shipping import ShippingQuote
+    from app.core.time import utc_now
+    from datetime import timedelta
+    import json
+
+    monkeypatch.setattr(
+        settings,
+        "MELHOR_ENVIO_SENDER",
+        json.dumps(
+            {
+                "name": "Loja",
+                "email": "loja@example.com",
+                "phone": "11999999999",
+                "address": "Rua Loja",
+                "number": "1",
+                "district": "Centro",
+                "city": "São Paulo",
+                "state_abbr": "SP",
+                "postal_code": "01001000",
+                "company_document": "12345678000195",
+                "state_register": "ISENTO",
+            }
+        ),
+    )
+    with Session(engine) as session:
+        product = session.get(Product, UUID(product_id))
+        product.shipping_width = 10
+        product.shipping_height = 10
+        product.shipping_length = 20
+        product.shipping_weight = 0.3
+        session.add(product)
+        quote = ShippingQuote(
+            environment="sandbox",
+            origin_postal_code="01001000",
+            postal_code="70000000",
+            items=[
+                {
+                    "id": product_id,
+                    "name": "Batom Real",
+                    "unit_price": 49.9,
+                    "quantity": 2,
+                    "width": 10,
+                    "height": 10,
+                    "length": 20,
+                    "weight": 0.3,
+                }
+            ],
+            services=[
+                {
+                    "id": 3,
+                    "name": ".Package",
+                    "company": "Jadlog",
+                    "cost": 18.6,
+                    "price": 18.6,
+                    "delivery_min": 5,
+                    "delivery_max": 6,
+                    "packages": [],
+                }
+            ],
+            subtotal=Decimal("99.80"),
+            expires_at=utc_now() + timedelta(minutes=15),
+        )
+        session.add(quote)
+        session.commit()
+        quote_id = str(quote.id)
+
     checkout_payload = {
         "address_id": address_id,
+        "shipping": {
+            "quote_id": quote_id,
+            "service_id": 3,
+            "recipient_name": "Maria Silva",
+            "recipient_email": "checkout@example.com",
+            "recipient_phone": "11999999999",
+            "recipient_document": "52998224725",
+        },
         "idempotency_key": idempotency_key,
         "items": [
             {
@@ -790,7 +868,7 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
         stock = session.exec(select(Stock)).one()
         movement = session.exec(select(StockMovement)).one()
 
-        assert payment.amount == Decimal("99.80")
+        assert payment.amount == Decimal("118.40")
         assert payment.provider_session_id == FakeStripeSession.id
         assert item.product_id == UUID(product_id)
         assert item.unit_price == Decimal("49.90")

@@ -23,6 +23,10 @@ class Product(SQLModel, table=True):
     active: bool = Field(default=True)
 
     volume: Optional[str] = None
+    shipping_width: Optional[float] = Field(default=None, gt=0)
+    shipping_height: Optional[float] = Field(default=None, gt=0)
+    shipping_length: Optional[float] = Field(default=None, gt=0)
+    shipping_weight: Optional[float] = Field(default=None, gt=0)
 
     # atributos
     target_audience: Optional[str] = None
