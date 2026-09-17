@@ -45,11 +45,9 @@ def login(login_credentials: Login, session: _SessionDep) -> Token:
         raise HTTPException(status_code=403, detail="Confirme seu email antes de entrar")
 
     access_token = LoginAndJWT.create_access_token(data={"sub": existing_user.email})
-    refresh_token = LoginAndJWT.create_refresh_token(data={"sub": existing_user.email})
 
     return Token(
         access_token=access_token,
-        refresh_token=refresh_token,
         token_type="bearer",
     )
 
@@ -73,11 +71,9 @@ def login_with_google(payload: GoogleLoginRequest, session: _SessionDep) -> Toke
         raise HTTPException(status_code=400, detail="Conta inativa")
 
     access_token = LoginAndJWT.create_access_token(data={"sub": existing_user.email})
-    refresh_token = LoginAndJWT.create_refresh_token(data={"sub": existing_user.email})
 
     return Token(
         access_token=access_token,
-        refresh_token=refresh_token,
         token_type="bearer",
     )
 

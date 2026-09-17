@@ -3,9 +3,11 @@ Testes de autenticacao da API ativa.
 Execute com: pytest tests/ -v
 """
 import os
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -152,7 +154,15 @@ def test_non_access_tokens_cannot_authenticate_protected_routes(token_kind):
     email = "admin@example.com"
     create_admin_token(email)
     token = {
-        "refresh": lambda: LoginAndJWT.create_refresh_token({"sub": email}),
+        "refresh": lambda: jwt.encode(
+            {
+                "sub": email,
+                "type": "refresh",
+                "exp": datetime.now(timezone.utc) + timedelta(days=7),
+            },
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM,
+        ),
         "password_reset": lambda: create_password_reset_token(email),
         "email_confirmation": lambda: create_email_confirmation_token(email),
     }[token_kind]()
@@ -347,7 +357,7 @@ def test_login():
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
-    assert "refresh_token" in data
+    assert "refresh_token" not in data
     assert data["token_type"] == "bearer"
 
 
