@@ -1,5 +1,5 @@
 # Importa todos os modelos SQLModel (Stack A) para que o SQLModel.metadata
-# os conheca ao criar tabelas e para que o Alembic os encontre via este modulo.
+# os conheca ao criar tabelas.
 from app.models.address import Address
 from app.models.brand import Brand
 from app.models.cart import Cart
@@ -13,7 +13,6 @@ from app.models.orderCouponLink import OrderCouponLink
 from app.models.orderItem import OrderItem
 from app.models.payment import Payment
 from app.models.paymentItem import PaymentItem
-from app.models.paymentMethod import PaymentMethod
 from app.models.product import Product
 from app.models.productImage import ProductImage
 from app.models.productReview import ProductReview
@@ -44,7 +43,6 @@ __all__ = [
     "OrderCouponLink",
     "Payment",
     "PaymentItem",
-    "PaymentMethod",
     "Stock",
     "StockMovement",
     "StockBatch",
