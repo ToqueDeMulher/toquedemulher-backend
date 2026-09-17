@@ -52,6 +52,8 @@ Referências oficiais:
 
    CEP: oito dígitos; telefone: DDD e número; documento da empresa: CNPJ;
    inscrição estadual: a informação real da loja, inclusive `ISENTO` se aplicável.
+   A cotação exige apenas o CEP de origem nesse JSON. Os demais dados do
+   remetente são obrigatórios antes de iniciar o pagamento e emitir etiquetas.
 4. Entre com uma conta administradora e acesse **Envios e etiquetas**
    (`/admin/envios`). Clique em **Conectar conta** e autorize o aplicativo.
    Use o mesmo hostname no frontend e no backend (`localhost` em ambos, por

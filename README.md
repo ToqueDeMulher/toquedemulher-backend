@@ -109,6 +109,30 @@ Neste projeto a Supabase esta sendo usada como Postgres. A autenticacao atual
 e propria do FastAPI, com usuarios e JWTs do backend. Nao e necessario ativar
 o provider Google em Supabase Auth para o fluxo atual.
 
+### Seguranca dos dados e imagens
+
+- O frontend acessa os dados pelo FastAPI. As tabelas em `public` devem ter RLS
+  ativado e nenhuma policy de acesso direto para `anon` ou `authenticated`.
+  Ao criar uma tabela, inclua `ENABLE ROW LEVEL SECURITY` na mesma migracao.
+- O backend usa a conexao Postgres com papel `postgres`. Esse papel ignora RLS;
+  portanto, a autorizacao de usuarios deve ser aplicada em cada endpoint.
+- Rotas protegidas aceitam somente JWT com `type=access`. Tokens de refresh,
+  confirmacao de email e redefinicao de senha nao autenticam requisicoes.
+  Tokens de acesso antigos sem `type` exigem novo login apos o deploy.
+- A chave `SUPABASE_SERVICE_ROLE_KEY` e usada apenas no backend para enviar
+  imagens de produtos. Nunca a coloque em variaveis `VITE_*` ou no frontend.
+  As rotas de upload de produtos exigem usuario administrador.
+- O bucket `product-images` e publico para leitura das imagens do catalogo.
+  Mantenha escritas no Storage restritas ao backend e limite MIME e tamanho no
+  bucket e na API.
+
+Para conferir o banco hospedado, execute
+`supabase db advisors --linked --type security` apos vincular o projeto.
+Revise tambem as permissoes padrao de novas tabelas:
+projetos antigos podem conceder acesso a `anon`, `authenticated` e
+`service_role` automaticamente, mesmo quando as tabelas atuais estao protegidas
+por RLS.
+
 ## Login com Google
 
 O endpoint `POST /api/v1/user/google` recebe o `credential` emitido pelo

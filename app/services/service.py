@@ -63,7 +63,6 @@ async def upload_to_supabase(*, product_id: UUID, file: UploadFile, extension: s
         "Authorization": f"Bearer {supabase_settings.key}",
         "apikey": supabase_settings.key,
         "Content-Type": file.content_type or "application/octet-stream",
-        "x-upsert": "true",
     }
 
     async with httpx.AsyncClient(timeout=supabase_settings.timeout) as client:
@@ -72,7 +71,7 @@ async def upload_to_supabase(*, product_id: UUID, file: UploadFile, extension: s
     if response.status_code >= 400:
         raise HTTPException(
             status_code=500,
-            detail=f"Supabase retornou erro {response.status_code}: {response.text}",
+            detail="Falha ao enviar imagem para o armazenamento.",
         )
 
     return f"{supabase_settings.url}/storage/v1/object/public/{supabase_settings.bucket}/{file_key}"

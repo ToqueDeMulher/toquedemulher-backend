@@ -33,6 +33,7 @@ from app.models.stockMovement import StockMovement, StockMovementType  # noqa: E
 from app.models.user import UserInDB  # noqa: E402
 from app.services.email_confirmation_service import create_email_confirmation_token  # noqa: E402
 from app.services.loginService import LoginAndJWT  # noqa: E402
+from app.services.password_reset_service import create_password_reset_token  # noqa: E402
 
 
 engine = create_engine(
@@ -98,6 +99,71 @@ def create_admin_token(email: str = "admin@example.com") -> str:
         },
     )
     return login_response.json()["access_token"]
+
+
+@pytest.mark.parametrize("path_suffix", ["images", "images/upload"])
+def test_product_image_upload_requires_admin(path_suffix, monkeypatch):
+    async def unexpected_upload(**kwargs):
+        pytest.fail("Storage upload must not run before admin authorization")
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.product.upload_to_supabase", unexpected_upload
+    )
+    path = f"/api/v1/products/{uuid4()}/{path_suffix}"
+    files = {"file": ("photo.jpg", b"image", "image/jpeg")}
+
+    assert client.post(path, files=files).status_code == 401
+
+    token = create_logged_user()
+    response = client.post(
+        path, files=files, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 403
+
+
+def test_admin_can_upload_product_image(monkeypatch):
+    with Session(engine) as session:
+        product = Product(slug="batom-imagem", name="Batom Imagem", price=49.9)
+        session.add(product)
+        session.commit()
+        product_id = product.id
+
+    uploads = []
+
+    async def fake_upload(**kwargs):
+        uploads.append(kwargs["product_id"])
+        return "https://example.test/product.jpg"
+
+    monkeypatch.setattr("app.api.v1.endpoints.product.upload_to_supabase", fake_upload)
+    token = create_admin_token()
+    response = client.post(
+        f"/api/v1/products/{product_id}/images",
+        files={"file": ("photo.jpg", b"image", "image/jpeg")},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["url"] == "https://example.test/product.jpg"
+    assert uploads == [product_id]
+
+
+@pytest.mark.parametrize("token_kind", ["refresh", "password_reset", "email_confirmation"])
+def test_non_access_tokens_cannot_authenticate_protected_routes(token_kind):
+    email = "admin@example.com"
+    create_admin_token(email)
+    token = {
+        "refresh": lambda: LoginAndJWT.create_refresh_token({"sub": email}),
+        "password_reset": lambda: create_password_reset_token(email),
+        "email_confirmation": lambda: create_email_confirmation_token(email),
+    }[token_kind]()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    assert client.get("/api/v1/user/me", headers=headers).status_code == 401
+    assert client.post(
+        f"/api/v1/products/{uuid4()}/images",
+        files={"file": ("photo.jpg", b"image", "image/jpeg")},
+        headers=headers,
+    ).status_code == 401
 
 
 def test_health_check():
