@@ -44,34 +44,6 @@ def send_email(
         return False
 
 
-def send_welcome_email(user_full_name: str, user_email: str) -> bool:
-    """Envia email de boas-vindas ao novo usuário."""
-    subject = f"Bem-vinda ao O Toque de Mulher, {user_full_name.split()[0]}! 💄"
-    html_body = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto;">
-        <div style="background: linear-gradient(135deg, #c0392b, #8e44ad); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0;">O Toque de Mulher</h1>
-        </div>
-        <div style="padding: 30px;">
-            <h2>Olá, {user_full_name.split()[0]}! 🌸</h2>
-            <p>Seja muito bem-vinda à nossa loja! Estamos felizes em ter você conosco.</p>
-            <p>Aqui você encontrará os melhores perfumes e produtos de beleza, selecionados especialmente para você.</p>
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{settings.FRONTEND_URL}/produtos"
-                   style="background: #c0392b; color: white; padding: 15px 30px;
-                          text-decoration: none; border-radius: 5px; font-weight: bold;">
-                    Explorar Produtos
-                </a>
-            </div>
-            <p>Com carinho,<br><strong>Equipe O Toque de Mulher</strong></p>
-        </div>
-    </body>
-    </html>
-    """
-    return send_email(user_email, subject, html_body)
-
-
 def send_password_reset_email(user_email: str, user_name: str, reset_token: str) -> bool:
     """Envia email de redefinição de senha."""
     reset_url = f"{settings.FRONTEND_URL}/redefinir-senha?token={reset_token}"
@@ -97,65 +69,6 @@ def send_password_reset_email(user_email: str, user_name: str, reset_token: str)
                 Se você não solicitou a redefinição de senha, ignore este email.
                 Sua senha permanecerá a mesma.
             </p>
-        </div>
-    </body>
-    </html>
-    """
-    return send_email(user_email, subject, html_body)
-
-
-def send_order_confirmation_email(
-    user_email: str, user_name: str, order_number: str, total: float
-) -> bool:
-    """Envia email de confirmação de pedido."""
-    subject = f"Pedido #{order_number} confirmado! 🎉"
-    html_body = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto;">
-        <div style="background: linear-gradient(135deg, #c0392b, #8e44ad); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0;">O Toque de Mulher</h1>
-        </div>
-        <div style="padding: 30px;">
-            <h2>Pedido Confirmado! ✅</h2>
-            <p>Olá, {user_name.split()[0]}! Seu pedido foi recebido com sucesso.</p>
-            <div style="background: #f9f9f9; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                <p><strong>Número do Pedido:</strong> #{order_number}</p>
-                <p><strong>Total:</strong> R$ {total:.2f}</p>
-            </div>
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{settings.FRONTEND_URL}/minha-conta/pedidos/{order_number}"
-                   style="background: #c0392b; color: white; padding: 15px 30px;
-                          text-decoration: none; border-radius: 5px; font-weight: bold;">
-                    Acompanhar Pedido
-                </a>
-            </div>
-            <p>Com carinho,<br><strong>Equipe O Toque de Mulher</strong></p>
-        </div>
-    </body>
-    </html>
-    """
-    return send_email(user_email, subject, html_body)
-
-
-def send_order_shipped_email(
-    user_email: str, user_name: str, order_number: str, tracking_code: str
-) -> bool:
-    """Envia email de notificação de envio."""
-    subject = f"Seu pedido #{order_number} foi enviado! 📦"
-    html_body = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto;">
-        <div style="background: linear-gradient(135deg, #c0392b, #8e44ad); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0;">O Toque de Mulher</h1>
-        </div>
-        <div style="padding: 30px;">
-            <h2>Seu pedido está a caminho! 🚚</h2>
-            <p>Olá, {user_name.split()[0]}! Seu pedido foi enviado.</p>
-            <div style="background: #f9f9f9; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                <p><strong>Número do Pedido:</strong> #{order_number}</p>
-                <p><strong>Código de Rastreamento:</strong> {tracking_code}</p>
-            </div>
-            <p>Com carinho,<br><strong>Equipe O Toque de Mulher</strong></p>
         </div>
     </body>
     </html>
