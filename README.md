@@ -10,7 +10,7 @@ Terminal do backend:
 
 ```bash
 cd toquedemulher-backend
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python scripts/check_supabase_connection.py
@@ -30,28 +30,24 @@ Variaveis de ambiente sao carregadas na inicializacao do processo.
 
 | Tecnologia | Versão | Finalidade |
 | :--- | :--- | :--- |
-| Python | 3.11+ | Linguagem principal |
-| FastAPI | 0.115 | Framework web assíncrono |
-| SQLAlchemy | 2.0 | ORM para banco de dados |
-| Alembic | 1.14 | Migrações de banco de dados |
-| PostgreSQL | 15+ | Banco de dados relacional |
-| Pydantic v2 | 2.10 | Validação de dados e schemas |
-| JWT (python-jose) | 3.3 | Autenticação stateless |
+| Python | 3.12 | Linguagem principal |
+| FastAPI | 0.116 | API HTTP |
+| SQLModel / SQLAlchemy | 0.0.24 / 2.0 | Persistência |
+| Supabase Postgres | 17 | Banco de dados e migrations |
+| Pydantic v2 | 2.11 | Validação de dados |
+| PyJWT | 2.10 | Tokens de acesso |
 | Passlib (bcrypt) | 1.7 | Hash seguro de senhas |
-| Mercado Pago SDK | 2.2 | Processamento de pagamentos |
+| Stripe | 14.4 | Checkout e webhook de pagamento |
 
 ## Funcionalidades
 
-- **Autenticação:** Registro, login, refresh token, recuperação de senha via email
-- **Usuários:** Perfil, endereços, upload de avatar, troca de senha
-- **Produtos:** Catálogo com filtros, busca, paginação, variantes e imagens
-- **Categorias:** Hierarquia de categorias com subcategorias
-- **Carrinho:** Adicionar, atualizar, remover itens com validação de estoque
-- **Pedidos:** Criação de pedidos com snapshot de endereço e produtos
-- **Pagamentos:** PIX, Boleto e Cartão de Crédito via Mercado Pago + Webhook
-- **Avaliações:** Sistema de reviews com fotos, verificação de compra e moderação
-- **Emails:** Boas-vindas, confirmação de pedido, envio e redefinição de senha
-- **Admin:** Endpoints protegidos para gestão de produtos, pedidos e usuários
+- **Autenticação:** Registro, login por senha ou Google, confirmação de email e recuperação de senha
+- **Usuários:** Perfil, endereços, métodos de pagamento, avatar e consulta de pedidos
+- **Produtos:** Cadastro administrativo, imagens, fornecedores e estoque
+- **Pagamentos:** Checkout Stripe com reserva de estoque e webhook assinado
+- **Frete:** Cotação, conexão administrativa e remessas via Melhor Envio
+- **Emails:** Confirmação de email e redefinição de senha
+- **Admin:** Dashboard e rotas protegidas de gestão
 
 ## Configuracao local
 
@@ -80,7 +76,7 @@ Variaveis principais:
 - `SECRET_KEY`: chave usada para assinar JWTs.
 - `GOOGLE_CLIENT_ID`: OAuth Client ID web do Google.
 - `VITE_GOOGLE_CLIENT_ID`: fallback aceito pelo backend caso a variavel do frontend tenha sido copiada para o servidor.
-- `CORS_ORIGINS`: origens permitidas, por padrao inclui `http://localhost:5173` e `http://127.0.0.1:5173`.
+- `CORS_ORIGINS`: origens permitidas, por padrao inclui `localhost` e `127.0.0.1` nas portas `3000`, `3001` e `5173`. A porta `3001` permite executar o Vite quando a `3000` ja esta ocupada. Se definir essa variavel, informe todas as origens que devem ser aceitas, separadas por virgula.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: credenciais SMTP para envio de e-mails transacionais.
 - `SMTP_STARTTLS`: habilita STARTTLS no SMTP. Padrao: `true`.
 - `EMAIL_FROM`, `EMAIL_FROM_NAME`: remetente exibido nos e-mails.
@@ -109,10 +105,34 @@ Neste projeto a Supabase esta sendo usada como Postgres. A autenticacao atual
 e propria do FastAPI, com usuarios e JWTs do backend. Nao e necessario ativar
 o provider Google em Supabase Auth para o fluxo atual.
 
+### Seguranca dos dados e imagens
+
+- O frontend acessa os dados pelo FastAPI. As tabelas em `public` devem ter RLS
+  ativado e nenhuma policy de acesso direto para `anon` ou `authenticated`.
+  Ao criar uma tabela, inclua `ENABLE ROW LEVEL SECURITY` na mesma migracao.
+- O backend usa a conexao Postgres com papel `postgres`. Esse papel ignora RLS;
+  portanto, a autorizacao de usuarios deve ser aplicada em cada endpoint.
+- Rotas protegidas aceitam somente JWT com `type=access`. Tokens de refresh,
+  confirmacao de email e redefinicao de senha nao autenticam requisicoes.
+  Tokens de acesso antigos sem `type` exigem novo login apos o deploy.
+- A chave `SUPABASE_SERVICE_ROLE_KEY` e usada apenas no backend para enviar
+  imagens de produtos. Nunca a coloque em variaveis `VITE_*` ou no frontend.
+  As rotas de upload de produtos exigem usuario administrador.
+- O bucket `product-images` e publico para leitura das imagens do catalogo.
+  Mantenha escritas no Storage restritas ao backend e limite MIME e tamanho no
+  bucket e na API.
+
+Para conferir o banco hospedado, execute
+`supabase db advisors --linked --type security` apos vincular o projeto.
+Revise tambem as permissoes padrao de novas tabelas:
+projetos antigos podem conceder acesso a `anon`, `authenticated` e
+`service_role` automaticamente, mesmo quando as tabelas atuais estao protegidas
+por RLS.
+
 ## Login com Google
 
 O endpoint `POST /api/v1/user/google` recebe o `credential` emitido pelo
-Google Identity Services, valida o ID token e emite os tokens JWT do backend.
+Google Identity Services, valida o ID token e emite um JWT de acesso do backend.
 
 Configure no `.env`:
 
@@ -241,15 +261,23 @@ invalida`, nao `Login com Google nao configurado`.
 ```text
 app/                 Código da API FastAPI
 app/api/v1/          Rotas HTTP versionadas
-app/api/v1/experimental/ Rotas não registradas, mantidas só como referência
 app/core/            Configuração, segurança, banco e utilitários centrais
 app/models/          Modelos persistidos no banco
 app/schemas/         Schemas de entrada e saída
 app/services/        Regras de negócio e integrações externas
-alembic/             Migrações Alembic legadas
 supabase/            Configuração e migrations usadas pela integração Supabase
 scripts/             Scripts operacionais
 docs/api-client/     Coleções de teste de API, incluindo Bruno
 tests/               Testes automatizados
 static/uploads/      Arquivos servidos localmente em desenvolvimento
 ```
+
+## Fretes: Melhor Envio e BrasilAPI
+
+O carrinho e o Stripe Checkout usam cotações reais do Melhor Envio. O painel
+`/admin/envios` conecta a conta por OAuth e permite preparar, pagar, gerar,
+imprimir e acompanhar etiquetas. A BrasilAPI preenche os endereços por CEP.
+
+Consulte [ativação e operação da integração](docs/shipping-integration.md) para
+aplicar a migração, configurar as credenciais do backend, remetente, medidas dos
+produtos e homologar o fluxo no Sandbox.

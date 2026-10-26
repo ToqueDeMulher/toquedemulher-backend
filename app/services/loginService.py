@@ -33,16 +33,7 @@ class LoginAndJWT:
         expire = datetime.now(timezone.utc) + (
             expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
-        to_encode.update({"exp": expire})
-        return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-
-    @staticmethod
-    def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> str:
-        to_encode = data.copy()
-        expire = datetime.now(timezone.utc) + (
-            expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        )
-        to_encode.update({"exp": expire, "type": "refresh"})
+        to_encode.update({"exp": expire, "type": "access"})
         return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
     @staticmethod
@@ -63,6 +54,8 @@ async def get_current_user(
         payload: dict[str, Any] = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
+        if payload.get("type") != "access":
+            raise credentials_exception
         username: str | None = payload.get("sub")
         if username is None:
             raise credentials_exception

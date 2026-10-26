@@ -3,9 +3,11 @@ Testes de autenticacao da API ativa.
 Execute com: pytest tests/ -v
 """
 import os
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -36,6 +38,7 @@ from app.models.stockMovement import StockMovement, StockMovementType  # noqa: E
 from app.models.user import UserInDB  # noqa: E402
 from app.services.email_confirmation_service import create_email_confirmation_token  # noqa: E402
 from app.services.loginService import LoginAndJWT  # noqa: E402
+from app.services.password_reset_service import create_password_reset_token  # noqa: E402
 
 
 engine = create_engine(
@@ -103,11 +106,126 @@ def create_admin_token(email: str = "admin@example.com") -> str:
     return login_response.json()["access_token"]
 
 
+@pytest.mark.parametrize("path_suffix", ["images", "images/upload"])
+def test_product_image_upload_requires_admin(path_suffix, monkeypatch):
+    async def unexpected_upload(**kwargs):
+        pytest.fail("Storage upload must not run before admin authorization")
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.product.upload_to_supabase", unexpected_upload
+    )
+    path = f"/api/v1/products/{uuid4()}/{path_suffix}"
+    files = {"file": ("photo.jpg", b"image", "image/jpeg")}
+
+    assert client.post(path, files=files).status_code == 401
+
+    token = create_logged_user()
+    response = client.post(
+        path, files=files, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 403
+
+
+def test_admin_can_upload_product_image(monkeypatch):
+    with Session(engine) as session:
+        product = Product(slug="batom-imagem", name="Batom Imagem", price=49.9)
+        session.add(product)
+        session.commit()
+        product_id = product.id
+
+    uploads = []
+
+    async def fake_upload(**kwargs):
+        uploads.append(kwargs["product_id"])
+        return "https://example.test/product.jpg"
+
+    monkeypatch.setattr("app.api.v1.endpoints.product.upload_to_supabase", fake_upload)
+    token = create_admin_token()
+    response = client.post(
+        f"/api/v1/products/{product_id}/images",
+        files={"file": ("photo.jpg", b"image", "image/jpeg")},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["url"] == "https://example.test/product.jpg"
+    assert uploads == [product_id]
+
+
+@pytest.mark.parametrize("token_kind", ["refresh", "password_reset", "email_confirmation"])
+def test_non_access_tokens_cannot_authenticate_protected_routes(token_kind):
+    email = "admin@example.com"
+    create_admin_token(email)
+    token = {
+        "refresh": lambda: jwt.encode(
+            {
+                "sub": email,
+                "type": "refresh",
+                "exp": datetime.now(timezone.utc) + timedelta(days=7),
+            },
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM,
+        ),
+        "password_reset": lambda: create_password_reset_token(email),
+        "email_confirmation": lambda: create_email_confirmation_token(email),
+    }[token_kind]()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    assert client.get("/api/v1/user/me", headers=headers).status_code == 401
+    assert client.post(
+        f"/api/v1/products/{uuid4()}/images",
+        files={"file": ("photo.jpg", b"image", "image/jpeg")},
+        headers=headers,
+    ).status_code == 401
+
+
 def test_health_check():
     response = client.get("/health")
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+@pytest.mark.parametrize("path", ["/api/v1/user/login", "/api/v1/user/register"])
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+)
+def test_auth_preflight_accepts_frontend_origins(path, origin):
+    response = client.options(
+        path,
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,authorization",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+    assert "POST" in response.headers["access-control-allow-methods"]
+
+
+@pytest.mark.parametrize("path", ["/api/v1/user/login", "/api/v1/user/register"])
+def test_auth_preflight_rejects_unlisted_origin(path):
+    response = client.options(
+        path,
+        headers={
+            "Origin": "https://untrusted.example",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
 
 
 def test_register_user():
@@ -242,7 +360,7 @@ def test_login():
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
-    assert "refresh_token" in data
+    assert "refresh_token" not in data
     assert data["token_type"] == "bearer"
 
 
@@ -687,10 +805,14 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
         order_id,
         payer_email=None,
         idempotency_key=None,
+        shipping_amount=Decimal("0"),
+        shipping_name="Frete",
     ):
         captured_items.extend(items)
         assert payer_email == "checkout@example.com"
         assert str(order_id)
+        assert shipping_amount == Decimal("18.60")
+        assert "Jadlog" in shipping_name
         assert idempotency_key
         return FakeStripeSession()
 
@@ -719,8 +841,82 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
         address_id = str(address.id)
         product_id = str(product.id)
 
+    from app.models.shipping import ShippingQuote
+    from app.core.time import utc_now
+    from datetime import timedelta
+    import json
+
+    monkeypatch.setattr(
+        settings,
+        "MELHOR_ENVIO_SENDER",
+        json.dumps(
+            {
+                "name": "Loja",
+                "email": "loja@example.com",
+                "phone": "11999999999",
+                "address": "Rua Loja",
+                "number": "1",
+                "district": "Centro",
+                "city": "São Paulo",
+                "state_abbr": "SP",
+                "postal_code": "01001000",
+                "company_document": "12345678000195",
+                "state_register": "ISENTO",
+            }
+        ),
+    )
+    with Session(engine) as session:
+        product = session.get(Product, UUID(product_id))
+        product.shipping_width = 10
+        product.shipping_height = 10
+        product.shipping_length = 20
+        product.shipping_weight = 0.3
+        session.add(product)
+        quote = ShippingQuote(
+            environment="sandbox",
+            origin_postal_code="01001000",
+            postal_code="70000000",
+            items=[
+                {
+                    "id": product_id,
+                    "name": "Batom Real",
+                    "unit_price": 49.9,
+                    "quantity": 2,
+                    "width": 10,
+                    "height": 10,
+                    "length": 20,
+                    "weight": 0.3,
+                }
+            ],
+            services=[
+                {
+                    "id": 3,
+                    "name": ".Package",
+                    "company": "Jadlog",
+                    "cost": 18.6,
+                    "price": 18.6,
+                    "delivery_min": 5,
+                    "delivery_max": 6,
+                    "packages": [],
+                }
+            ],
+            subtotal=Decimal("99.80"),
+            expires_at=utc_now() + timedelta(minutes=15),
+        )
+        session.add(quote)
+        session.commit()
+        quote_id = str(quote.id)
+
     checkout_payload = {
         "address_id": address_id,
+        "shipping": {
+            "quote_id": quote_id,
+            "service_id": 3,
+            "recipient_name": "Maria Silva",
+            "recipient_email": "checkout@example.com",
+            "recipient_phone": "11999999999",
+            "recipient_document": "52998224725",
+        },
         "idempotency_key": idempotency_key,
         "items": [
             {
@@ -751,7 +947,7 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
         stock = session.exec(select(Stock)).one()
         movement = session.exec(select(StockMovement)).one()
 
-        assert payment.amount == Decimal("99.80")
+        assert payment.amount == Decimal("118.40")
         assert payment.provider_session_id == FakeStripeSession.id
         assert item.product_id == UUID(product_id)
         assert item.unit_price == Decimal("49.90")

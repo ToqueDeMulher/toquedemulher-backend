@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlmodel import select
 
 from app.api.dependencies import addToDB
@@ -8,9 +8,20 @@ from app.core.db import _SessionDep
 from app.core.settings import settings
 from app.core.time import utc_now
 from app.models.user import UserInDB
-from app.schemas.user import ForgotPasswordRequest, GoogleLoginRequest, Login, Token
+from app.schemas.message import Message
+from app.schemas.user import (
+    ForgotPasswordRequest,
+    GoogleLoginRequest,
+    Login,
+    ResetPasswordRequest,
+    Token,
+)
 from app.services.google_identity_service import verify_google_credential
 from app.services.loginService import LoginAndJWT
+from app.services.password_reset_service import (
+    send_password_reset_flow,
+    verify_password_reset_token,
+)
 
 router = APIRouter(prefix="/user")
 
@@ -34,11 +45,9 @@ def login(login_credentials: Login, session: _SessionDep) -> Token:
         raise HTTPException(status_code=403, detail="Confirme seu email antes de entrar")
 
     access_token = LoginAndJWT.create_access_token(data={"sub": existing_user.email})
-    refresh_token = LoginAndJWT.create_refresh_token(data={"sub": existing_user.email})
 
     return Token(
         access_token=access_token,
-        refresh_token=refresh_token,
         token_type="bearer",
     )
 
@@ -62,17 +71,49 @@ def login_with_google(payload: GoogleLoginRequest, session: _SessionDep) -> Toke
         raise HTTPException(status_code=400, detail="Conta inativa")
 
     access_token = LoginAndJWT.create_access_token(data={"sub": existing_user.email})
-    refresh_token = LoginAndJWT.create_refresh_token(data={"sub": existing_user.email})
 
     return Token(
         access_token=access_token,
-        refresh_token=refresh_token,
         token_type="bearer",
     )
 
 
+GENERIC_FORGOT_PASSWORD_MESSAGE = (
+    "Se este email estiver cadastrado, as instrucoes de recuperacao serao enviadas."
+)
+
+
 @router.post("/forgot-password", status_code=200)
-def forgot_password(_: ForgotPasswordRequest):
-    return {
-        "message": "Se este email estiver cadastrado, as instrucoes de recuperacao serao enviadas.",
-    }
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    session: _SessionDep,
+    background_tasks: BackgroundTasks,
+):
+    existing_user = session.exec(
+        select(UserInDB).where(UserInDB.email == payload.email)
+    ).first()
+
+    if existing_user and not existing_user.disabled:
+        background_tasks.add_task(
+            send_password_reset_flow, existing_user.name, existing_user.email
+        )
+
+    return {"message": GENERIC_FORGOT_PASSWORD_MESSAGE}
+
+
+@router.post("/reset-password", response_model=Message, status_code=200)
+def reset_password(data: ResetPasswordRequest, session: _SessionDep):
+    email = verify_password_reset_token(data.token)
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Token de redefinicao invalido ou expirado")
+
+    db_user = session.exec(select(UserInDB).where(UserInDB.email == email)).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+
+    db_user.hashed_password = LoginAndJWT.hashing_password(data.new_password)
+    addToDB(db_user, session)
+
+    return Message(mensagem="Senha redefinida com sucesso")

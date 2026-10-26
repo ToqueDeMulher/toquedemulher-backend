@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     addressRouter,
+    shipping,
+    brasilApi,
     admin,
     login,
     paymentMethodRouter,
@@ -27,3 +29,6 @@ api_router.include_router(paymentMethodRouter.router)
 api_router.include_router(stock.router)
 api_router.include_router(supplier.router)
 api_router.include_router(supplierProduct.router)
+
+api_router.include_router(shipping.router)
+api_router.include_router(brasilApi.router)

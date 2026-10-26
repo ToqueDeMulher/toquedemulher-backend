@@ -2,6 +2,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from app.schemas.shipping import ShippingSelection
 
 
 class CheckoutItem(BaseModel):
@@ -12,10 +13,12 @@ class CheckoutItem(BaseModel):
     unit_price: float = Field(gt=0)
     quantity: int = Field(gt=0)
 
+
 class CreateCheckoutRequest(BaseModel):
     address_id: UUID
     idempotency_key: UUID
-    items: List[CheckoutItem] = Field(min_length=1)
+    items: List[CheckoutItem] = Field(min_length=1, max_length=100)
+    shipping: Optional[ShippingSelection] = None
 
 
 class CheckoutResponse(BaseModel):

@@ -1,4 +1,8 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+import os
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile, status
 from sqlmodel import select
 
 from app.api.dependencies import CurrentUser, addToDB
@@ -34,6 +38,27 @@ from app.services.email_confirmation_service import (
 from app.services.loginService import LoginAndJWT
 
 router = APIRouter(prefix="/user")
+
+ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_AVATAR_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+STATIC_DIR = Path(__file__).resolve().parents[4] / "static"
+
+
+def _to_user_response(db_user: UserInDB) -> GetUserResponse:
+    return GetUserResponse(
+        id=str(db_user.id),
+        name=db_user.name,
+        cpf=db_user.cpf,
+        email=db_user.email,
+        phone=db_user.phone,
+        gender=db_user.gender,
+        birth_date=db_user.birth_date,
+        accepts_marketing=db_user.accepts_marketing,
+        created_at=db_user.created_at.date(),
+        email_confirmed_at=db_user.email_confirmed_at,
+        role=db_user.role,
+        avatar_url=db_user.avatar_url,
+    )
 
 
 @router.post("/register", response_model=Message, status_code=201)
@@ -88,19 +113,48 @@ def get_user(session: _SessionDep, user: CurrentUser):
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario nao encontrado")
 
-    return GetUserResponse(
-        id=str(db_user.id),
-        name=db_user.name,
-        cpf=db_user.cpf,
-        email=db_user.email,
-        phone=db_user.phone,
-        gender=db_user.gender,
-        birth_date=db_user.birth_date,
-        accepts_marketing=db_user.accepts_marketing,
-        created_at=db_user.created_at.date(),
-        email_confirmed_at=db_user.email_confirmed_at,
-        role=db_user.role,
-    )
+    return _to_user_response(db_user)
+
+
+@router.post("/me/avatar", response_model=GetUserResponse)
+def upload_avatar(
+    session: _SessionDep,
+    user: CurrentUser,
+    file: UploadFile = File(...),
+):
+    if file.content_type not in ALLOWED_AVATAR_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Formato de imagem invalido. Use JPEG, PNG ou WebP.",
+        )
+
+    original_name = os.path.basename(file.filename or "")
+    _, ext = os.path.splitext(original_name)
+    ext = ext.lower()
+
+    if ext not in ALLOWED_AVATAR_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Extensao de arquivo invalida.",
+        )
+
+    db_user = session.get(UserInDB, user.id)
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+
+    avatar_dir = STATIC_DIR / "uploads" / "avatars"
+    avatar_dir.mkdir(parents=True, exist_ok=True)
+
+    filename = f"{uuid.uuid4()}{ext}"
+
+    with open(avatar_dir / filename, "wb") as buffer:
+        buffer.write(file.file.read())
+
+    db_user.avatar_url = f"/static/uploads/avatars/{filename}"
+    addToDB(db_user, session)
+
+    return _to_user_response(db_user)
 
 
 @router.get("/me/orders", response_model=list[AccountOrderResponse])

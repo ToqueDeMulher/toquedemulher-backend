@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = (
         "http://localhost:3000,"
         "http://127.0.0.1:3000,"
+        "http://localhost:3001,"
+        "http://127.0.0.1:3001,"
         "http://localhost:5173,"
         "http://127.0.0.1:5173"
     )
@@ -38,7 +40,6 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     FRONTEND_SUCCESS_URL: str = "http://localhost:5173/checkout/success"
     FRONTEND_PENDING_URL: str = "http://localhost:5173/checkout/pending"
@@ -77,6 +78,18 @@ class Settings(BaseSettings):
 
     # Mercado Pago (usado por payment_service.py)
     MERCADOPAGO_ACCESS_TOKEN: str = ""
+
+    # Melhor Envio: secrets remain exclusively on the backend.
+    MELHOR_ENVIO_ENVIRONMENT: str = "sandbox"
+    MELHOR_ENVIO_CLIENT_ID: str = ""
+    MELHOR_ENVIO_CLIENT_SECRET: str = ""
+    MELHOR_ENVIO_REDIRECT_URI: str = "http://localhost:8000/api/v1/shipping/oauth/callback"
+    MELHOR_ENVIO_USER_AGENT: str = ""
+    MELHOR_ENVIO_SENDER: str = "{}"
+    MELHOR_ENVIO_SERVICES: str = "1,2,3,4"
+    MELHOR_ENVIO_TIMEOUT: float = 10.0
+    MELHOR_ENVIO_QUOTE_TTL_MINUTES: int = 15
+    MELHOR_ENVIO_FREE_SHIPPING_THRESHOLD: float = 150.0
 
     # Upload
     UPLOAD_DIR: str = "uploads"

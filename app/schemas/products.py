@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from uuid import UUID
 from app.schemas.supplier_product import SupplierProductRequest
@@ -12,6 +12,10 @@ class ProductRequest(BaseModel):
     price: float
     active: bool = True
     volume: Optional[str] = None
+    shipping_width: Optional[float] = Field(default=None, gt=0, le=300)
+    shipping_height: Optional[float] = Field(default=None, gt=0, le=300)
+    shipping_length: Optional[float] = Field(default=None, gt=0, le=300)
+    shipping_weight: Optional[float] = Field(default=None, gt=0, le=1000)
 
     target_audience: Optional[str] = None
     product_type: Optional[str] = None
