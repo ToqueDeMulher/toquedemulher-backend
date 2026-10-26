@@ -141,12 +141,16 @@ async def stripe_webhook(request: Request, session: _SessionDep):
         return {"status": "ignored", "event_type": event_type}
 
     data = event["data"]["object"]
+    if event_type == "charge.refunded" and _object_value(data, "refunded") is not True:
+        return {"status": "ignored", "reason": "partial refund"}
     target_status = _target_status(event_type, data)
 
     try:
         with session.begin_nested():
             payment = _find_payment(event_type, data, session)
             if not payment:
+                if _metadata_order_id(data):
+                    raise HTTPException(503, "Pedido ainda não disponível. Reenvie o evento.")
                 return {"status": "ignored", "reason": "payment não encontrado"}
 
             current_status = str(payment.status)

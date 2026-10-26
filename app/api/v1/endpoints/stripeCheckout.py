@@ -81,23 +81,7 @@ def _existing_checkout_response(payment: Payment) -> CheckoutResponse:
 
 
 def _resolve_product(item, session: Session) -> Product | None:
-    if item.id:
-        try:
-            product_id = UUID(item.id)
-        except ValueError:
-            product_id = None
-
-        if product_id:
-            product = session.get(Product, product_id)
-            if product:
-                return product
-
-    if item.slug:
-        product = session.exec(select(Product).where(Product.slug == item.slug)).first()
-        if product:
-            return product
-
-    return session.exec(select(Product).where(Product.name == item.name)).first()
+    return shipping_service.resolve_product(item, session)
 
 
 @router.post("/checkout", response_model=CheckoutResponse)
@@ -150,13 +134,15 @@ def create_checkout(
             total_amount += Decimal(str(shipping_option["price"]))
 
             # Valida produtos e reserva estoque (SELECT FOR UPDATE evita overselling)
-            for item in payload.items:
+            for item in sorted(payload.items, key=lambda item: item.id or ""):
                 product = _resolve_product(item, session)
                 if not product or not product.active:
                     raise HTTPException(
                         status_code=404,
                         detail=f"Produto '{item.name}' não encontrado ou inativo",
                     )
+                if product.price <= 0:
+                    raise HTTPException(409, "Produto indisponível para compra")
 
                 stock = session.exec(
                     select(Stock)
@@ -305,10 +291,17 @@ def cancel_checkout(order_id: UUID, session: _SessionDep, user: CurrentUser):
                 "Erro ao expirar checkout Stripe: payment_id=%s",
                 payment.id,
             )
-            raise HTTPException(
-                status_code=502,
-                detail="Não foi possível cancelar a sessão de pagamento",
-            ) from exc
+            # A previous successful expiration may have lost its response.
+            # Release only after the provider confirms expiration, never on a timeout.
+            try:
+                remote = retrieve_checkout_session(payment.provider_session_id)
+            except Exception:
+                remote = None
+            if not remote or _stripe_value(remote, "status") != "expired":
+                raise HTTPException(
+                    status_code=502,
+                    detail="Não foi possível confirmar o cancelamento. Consulte seu pedido antes de tentar pagar novamente.",
+                ) from exc
 
         try:
             with session.begin_nested():

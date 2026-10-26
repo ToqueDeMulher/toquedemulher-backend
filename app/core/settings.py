@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     SMTP_STARTTLS: bool = True
     EMAIL_FROM: str = "noreply@toquedemulher.com.br"
     EMAIL_FROM_NAME: str = "Toque de Mulher"
+    CONTACT_RECIPIENT_EMAIL: str = ""
+    STORE_CONTACT_EMAIL: str = ""
     EMAIL_CONFIRMATION_REQUIRED: bool = False
     EMAIL_CONFIRMATION_EXPIRE_MINUTES: int = 1440
     EMAIL_CONFIRMATION_TEMPLATE_PATH: str = "supabase/templates/confirmation.html"
@@ -72,6 +74,7 @@ class Settings(BaseSettings):
     SUPABASE_FOLDER: str = "products"
     SUPABASE_TIMEOUT: float = 20.0
     PRODUCT_IMAGE_MAX_BYTES: int = 5 * 1024 * 1024
+    CREATE_TABLES_ON_STARTUP: bool = False
 
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""

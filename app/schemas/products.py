@@ -33,6 +33,16 @@ class ProductRequest(BaseModel):
     description_id: Optional[int] = None
     supplier_products: Optional[List[SupplierProductRequest]] = []
 
+
+class ProductUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    slug: Optional[str] = None
+    name: Optional[str] = None
+    price: Optional[float] = Field(default=None, ge=0)
+    active: Optional[bool] = None
+
+
 class ProductResponse(BaseModel):
     id: UUID
     slug: str

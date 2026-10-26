@@ -61,9 +61,9 @@ Referências oficiais:
    minutos e uso único. Em produção, o callback deve usar HTTPS.
 5. No mesmo painel, selecione cada produto e informe as medidas unitárias do
    produto embalado em centímetros e o peso em quilogramas. Produtos sem medidas
-   ou ausentes/inativos no banco não podem ser cotados. O catálogo atual do
-   frontend utiliza dados locais: os itens precisam corresponder aos produtos
-   reais cadastrados (UUID, slug ou nome), como já ocorre no checkout Stripe.
+   ou ausentes/inativos no banco não podem ser cotados. O catálogo do
+   frontend utiliza exclusivamente a API e os UUIDs dos produtos cadastrados.
+   Nomes e slugs não substituem UUID no frete ou no checkout.
 
 ## Fluxo do cliente
 

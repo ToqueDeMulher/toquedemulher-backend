@@ -6,12 +6,12 @@ from app.schemas.shipping import ShippingSelection
 
 
 class CheckoutItem(BaseModel):
-    id: Optional[str] = None
+    id: str
     slug: Optional[str] = None
-    name: str
-    product_url: str
-    unit_price: float = Field(gt=0)
-    quantity: int = Field(gt=0)
+    name: str = ""
+    product_url: str = ""
+    unit_price: Optional[float] = Field(default=None, ge=0)
+    quantity: int = Field(gt=0, le=100)
 
 
 class CreateCheckoutRequest(BaseModel):

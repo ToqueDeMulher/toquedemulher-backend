@@ -249,16 +249,10 @@ def sender():
 def resolve_product(item, session):
     if item.id:
         try:
-            product = session.get(Product, UUID(item.id))
-            if product:
-                return product
+            return session.get(Product, UUID(item.id))
         except ValueError:
             pass
-    if item.slug:
-        product = session.exec(select(Product).where(Product.slug == item.slug)).first()
-        if product:
-            return product
-    return session.exec(select(Product).where(Product.name == item.name)).first()
+    return None
 
 
 def resolved_items(items, session):
@@ -305,7 +299,10 @@ def normalize_services(data, subtotal):
         try:
             cost = Decimal(str(item.get("custom_price", item.get("price"))))
             time = int(item.get("custom_delivery_time", item.get("delivery_time")))
-            interval = item.get("custom_delivery_range") or {"min": time, "max": time}
+            interval = item.get("custom_delivery_range") or item.get("delivery_range") or {"min": time, "max": time}
+            delivery_min, delivery_max = int(interval["min"]), int(interval["max"])
+            if not 0 <= delivery_min <= delivery_max:
+                continue
             packages = item["packages"]
             if not cost.is_finite() or cost < 0 or time < 0 or not packages:
                 continue
@@ -326,8 +323,8 @@ def normalize_services(data, subtotal):
                     "company": item["company"]["name"],
                     "cost": float(cost.quantize(Decimal("0.01"))),
                     "price": float(cost.quantize(Decimal("0.01"))),
-                    "delivery_min": int(interval["min"]),
-                    "delivery_max": int(interval["max"]),
+                    "delivery_min": delivery_min,
+                    "delivery_max": delivery_max,
                     "packages": packages,
                 }
             )
@@ -395,7 +392,7 @@ def create_quote(payload, session):
         "subtotal": float(subtotal),
         "expires_at": aware(quote.expires_at),
         "item_prices": [
-            {"name": item["name"], "unit_price": item["unit_price"]}
+            {"id": item["id"], "name": item["name"], "unit_price": item["unit_price"]}
             for item in quote.items
         ],
         "services": [

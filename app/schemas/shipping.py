@@ -4,9 +4,9 @@ from pydantic import BaseModel, Field, EmailStr, field_validator
 
 
 class ShippingItem(BaseModel):
-    id: Optional[str] = None
+    id: str
     slug: Optional[str] = None
-    name: str = Field(min_length=1, max_length=255)
+    name: str = Field(default="", max_length=255)
     quantity: int = Field(gt=0, le=100)
 
 

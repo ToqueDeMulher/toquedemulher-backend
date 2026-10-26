@@ -281,3 +281,9 @@ imprimir e acompanhar etiquetas. A BrasilAPI preenche os endereços por CEP.
 Consulte [ativação e operação da integração](docs/shipping-integration.md) para
 aplicar a migração, configurar as credenciais do backend, remetente, medidas dos
 produtos e homologar o fluxo no Sandbox.
+
+## Revisão de funcionamento da loja (26/10/2026)
+
+Leia [o relatório da revisão](docs/storefront-review.md) para diagnóstico do HTTP 500 publicado, novos contratos de catálogo/contato, variáveis externas e resultados dos testes.
+
+O startup não cria tabelas por padrão. Prepare um banco local/staging isolado com as migrations do projeto antes de iniciar a API. `CREATE_TABLES_ON_STARTUP=true` fica restrito a ambientes descartáveis; não substitui migrations nem deve ser usado em produção. Nenhum banco publicado foi alterado nesta revisão.
