@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
+from sqlalchemy.engine import make_url
+
 
 DEFAULT_SUPABASE_PROJECT_REF = "inugzqvfzgnxbpxfbkqa"
 
@@ -77,15 +79,34 @@ def database_engine_options(
     pool_size: int = 10,
     max_overflow: int = 20,
     pool_recycle: int = 1800,
-    pool_mode: str = "queue",
+    pool_mode: str = "auto",
+    connect_timeout: int = 10,
+    pool_timeout: int = 10,
+    serverless: bool = False,
 ) -> dict[str, Any]:
     options: dict[str, Any] = {"echo": echo}
+
+    mode = pool_mode.strip().lower()
+    if mode not in {"auto", "queue", "null"}:
+        raise ValueError("DB_POOL_MODE deve ser auto, queue ou null.")
+    if connect_timeout < 1 or pool_timeout < 1:
+        raise ValueError("Os timeouts do banco devem ser maiores que zero.")
 
     if database_url.startswith("sqlite"):
         options["connect_args"] = {"check_same_thread": False}
         return options
 
-    if pool_mode.lower() == "null":
+    url = make_url(database_url)
+    if url.get_backend_name() == "postgresql":
+        options["connect_args"] = {"connect_timeout": connect_timeout}
+
+    if mode == "auto":
+        transaction_pooler = (
+            (url.host or "").endswith(".pooler.supabase.com") and url.port == 6543
+        )
+        mode = "null" if serverless or transaction_pooler else "queue"
+
+    if mode == "null":
         from sqlalchemy.pool import NullPool
 
         options["poolclass"] = NullPool
@@ -97,5 +118,6 @@ def database_engine_options(
         pool_size=pool_size,
         max_overflow=max_overflow,
         pool_recycle=pool_recycle,
+        pool_timeout=pool_timeout,
     )
     return options

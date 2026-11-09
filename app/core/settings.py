@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.database_url import (
@@ -25,7 +26,10 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
     DB_POOL_RECYCLE: int = 1800
-    DB_POOL_MODE: str = "queue"
+    DB_POOL_MODE: str = "auto"
+    DB_CONNECT_TIMEOUT: int = Field(default=10, ge=1)
+    DB_POOL_TIMEOUT: int = Field(default=10, ge=1)
+    VERCEL: bool = False
 
     CORS_ORIGINS: str = (
         "http://localhost:3000,"
@@ -114,6 +118,9 @@ class Settings(BaseSettings):
             max_overflow=self.DB_MAX_OVERFLOW,
             pool_recycle=self.DB_POOL_RECYCLE,
             pool_mode=self.DB_POOL_MODE,
+            connect_timeout=self.DB_CONNECT_TIMEOUT,
+            pool_timeout=self.DB_POOL_TIMEOUT,
+            serverless=self.VERCEL,
         )
 
 
