@@ -1,10 +1,13 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+from math import isfinite
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.router import api_router
@@ -24,6 +27,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Toque de Mulher API", lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request, exc):
+    # Validation inputs can include NaN/Infinity, which JSONResponse cannot serialize.
+    return JSONResponse(status_code=422, content=jsonable_encoder(
+        {'detail': exc.errors()}, custom_encoder={float: lambda v: v if isfinite(v) else None}))
 
 
 @app.exception_handler(SQLAlchemyError)

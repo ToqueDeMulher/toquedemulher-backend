@@ -1,10 +1,11 @@
 from typing import Optional
 from datetime import date
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List
 from datetime import datetime
 
 class stockItemRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
     product_name: str
     quantity: int = Field(gt=0)
     unit_cost: float = Field(gt=0)

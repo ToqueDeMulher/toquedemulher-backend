@@ -5,11 +5,11 @@ from app.schemas.supplier_product import SupplierProductRequest
 from typing import List
 
 class ProductRequest(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
 
     slug: Optional[str] = None
     name: str
-    price: float
+    price: float = Field(ge=0)
     active: bool = True
     volume: Optional[str] = None
     shipping_width: Optional[float] = Field(default=None, gt=0, le=300)
@@ -35,7 +35,7 @@ class ProductRequest(BaseModel):
 
 
 class ProductUpdateRequest(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
 
     slug: Optional[str] = None
     name: Optional[str] = None
