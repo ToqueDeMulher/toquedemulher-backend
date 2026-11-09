@@ -93,13 +93,29 @@ crie um `.env` e preencha uma das opções:
 
 Use conexão direta para backend persistente com IPv6. Em ambientes IPv4-only,
 use a URL do Supavisor em session mode no `DATABASE_URL`. Se usar Supavisor
-transaction mode na porta `6543`, defina `DB_POOL_MODE=null`.
+transaction mode na porta `6543`, o modo automatico desativa o pool local.
+
+- `DB_POOL_MODE=auto` (padrao): usa `NullPool` na Vercel (`VERCEL=1`) e no
+  Supavisor transaction mode; nos demais ambientes, usa o pool local. Cada sessao
+  fecha sua conexao ao terminar quando `NullPool` esta ativo. `queue` e `null`
+  permitem selecionar o comportamento explicitamente.
+- `DB_CONNECT_TIMEOUT=10`: limite em segundos por tentativa de conexao do driver
+  PostgreSQL. Um host com varios enderecos pode exigir mais de uma tentativa.
+- `DB_POOL_TIMEOUT=10`: limite em segundos aguardando vaga no pool local.
+
+Esses ajustes nao substituem uma connection string valida nem recuperam um
+projeto indisponivel. Copie o endpoint atual da opcao Connect do painel Supabase;
+nao troque regiao, host ou porta por tentativa.
 
 Para validar sem expor segredos:
 
 ```bash
 python scripts/check_supabase_connection.py
 ```
+
+O diagnostico retorna codigo `0` quando conecta e `2` quando falha, sem imprimir
+senha ou connection string. A revisao de acesso de 09/11/2026 esta registrada em
+[diagnostico do Supabase](docs/supabase-audit.md#revisao-de-acesso-em-09112026).
 
 Neste projeto a Supabase esta sendo usada como Postgres. A autenticacao atual
 e propria do FastAPI, com usuarios e JWTs do backend. Nao e necessario ativar
@@ -114,13 +130,19 @@ o provider Google em Supabase Auth para o fluxo atual.
   portanto, a autorizacao de usuarios deve ser aplicada em cada endpoint.
 - Rotas protegidas aceitam somente JWT com `type=access`. Tokens de refresh,
   confirmacao de email e redefinicao de senha nao autenticam requisicoes.
-  Tokens de acesso antigos sem `type` exigem novo login apos o deploy.
+  O `sub` do acesso e o UUID do usuario, e a versao da senha tambem e conferida.
+  Trocar ou redefinir a senha invalida sessoes anteriores. Tokens antigos exigem
+  novo login apos o deploy; links antigos de confirmacao/recuperacao devem ser
+  solicitados novamente.
 - A chave `SUPABASE_SERVICE_ROLE_KEY` e usada apenas no backend para enviar
   imagens de produtos. Nunca a coloque em variaveis `VITE_*` ou no frontend.
   As rotas de upload de produtos exigem usuario administrador.
 - O bucket `product-images` e publico para leitura das imagens do catalogo.
   Mantenha escritas no Storage restritas ao backend e limite MIME e tamanho no
   bucket e na API.
+- Avatares usam o mesmo bucket configurado, na pasta `avatars/<UUID>/`, com
+  uploads limitados e URL HTTPS persistida no perfil. Fotos antigas gravadas no
+  disco local podem ser substituidas por um novo upload.
 
 Para conferir o banco hospedado, execute
 `supabase db advisors --linked --type security` apos vincular o projeto.
@@ -198,6 +220,9 @@ Fluxo ativo:
 - A pagina `/confirm-email` do frontend chama `POST /api/v1/user/confirm-email`.
 - O backend valida o token e preenche `user.email_confirmed_at`.
 - Se `EMAIL_CONFIRMATION_REQUIRED=true`, `POST /api/v1/user/login` bloqueia usuarios ainda nao confirmados.
+- `POST /api/v1/user/resend-confirmation`, com `{"email":"cliente@example.com"}`,
+  permite solicitar um novo link sem divulgar se o endereco esta cadastrado.
+- Trocar o email remove a confirmacao anterior e agenda um link para o novo email.
 
 Se SMTP nao estiver configurado, o cadastro continua funcionando e o backend
 registra aviso no log. Para e-mails reais, preencha as variaveis SMTP e
@@ -287,3 +312,10 @@ produtos e homologar o fluxo no Sandbox.
 Leia [o relatório da revisão](docs/storefront-review.md) para diagnóstico do HTTP 500 publicado, novos contratos de catálogo/contato, variáveis externas e resultados dos testes.
 
 O startup não cria tabelas por padrão. Prepare um banco local/staging isolado com as migrations do projeto antes de iniciar a API. `CREATE_TABLES_ON_STARTUP=true` fica restrito a ambientes descartáveis; não substitui migrations nem deve ser usado em produção. Nenhum banco publicado foi alterado nesta revisão.
+
+## Revisao do backend (09/11/2026)
+
+Leia [as correcoes e os requisitos de publicacao](docs/backend-review.md) para as
+mudancas em tokens, recuperacao/confirmacao de email, avatares, validacao de
+numeros e concorrencia de estoque. Usuarios precisam entrar novamente depois
+de publicar essa versao.
