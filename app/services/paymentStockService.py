@@ -32,6 +32,7 @@ def release_checkout_stock(
             select(Stock)
             .where(Stock.product_id == product_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         ).first()
         if not stock:
             raise RuntimeError(

@@ -6,6 +6,7 @@ from app.models.stock_batch import StockBatch
 from app.models.stock import Stock
 from app.schemas.message import Message
 from sqlmodel import select
+from sqlalchemy.exc import SQLAlchemyError
 from app.core.db import _SessionDep
 from app.api.dependencies import AdminUser
 from app.core.time import utc_now
@@ -24,13 +25,23 @@ def add_to_stock(user: AdminUser, stock_info: StockRequest, session: _SessionDep
         if not supplier:
             raise HTTPException(status_code= 400, detail= "Fornecedor não existente")
         
-        for item in stock_info.items: 
+        names = {item.product_name for item in stock_info.items}
+        products = session.exec(select(Product).where(Product.name.in_(names))).all()
+        products_by_name = {product.name: product for product in products}
+        if names - products_by_name.keys():
+            raise HTTPException(status_code=400, detail="Produto não existente")
 
-            product = session.exec(select(Product).where(Product.name == item.product_name)).first()
+        # Checkout and reserve release also acquire stock locks in UUID order.
+        for item in sorted(stock_info.items,
+                           key=lambda item: str(products_by_name[item.product_name].id)):
+            product_id = products_by_name[item.product_name].id
+            product = session.exec(select(Product).where(Product.id == product_id)
+                                   .with_for_update(key_share=True)).first()
             if not product:
                 raise HTTPException(status_code= 400, detail= "Produto não existente")
             
-            stock = session.exec(select(Stock).where(Stock.product_id == product.id)).first()
+            stock = session.exec(select(Stock).where(Stock.product_id == product.id)
+                                 .with_for_update().execution_options(populate_existing=True)).first()
 
             if not stock:
                 stock = Stock(
@@ -68,6 +79,10 @@ def add_to_stock(user: AdminUser, stock_info: StockRequest, session: _SessionDep
         return Message(mensagem="Estoque atualizado") 
     
     except HTTPException:
+        session.rollback()
+        raise
+    except SQLAlchemyError:
+        session.rollback()
         raise
     except Exception:
         session.rollback()

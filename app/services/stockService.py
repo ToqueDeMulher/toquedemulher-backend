@@ -12,7 +12,9 @@ class StockService():
 
     @staticmethod
     def get_product_by_slug(slug: str, session: _SessionDep) -> Product:
-        product = session.exec(select(Product).where(Product.slug == slug)).first()
+        # Serialize administrative writes without blocking FK checks from checkout.
+        product = session.exec(select(Product).where(Product.slug == slug)
+                               .with_for_update(key_share=True)).first()
 
         if not product:
             raise HTTPException(status_code=404,detail="Produto não encontrado")
@@ -21,7 +23,8 @@ class StockService():
 
     @staticmethod
     def get_stock_by_product_id(product_id: UUID, session: _SessionDep) -> Stock:
-        stock = session.exec(select(Stock).where(Stock.product_id == product_id)).first()
+        stock = session.exec(select(Stock).where(Stock.product_id == product_id)
+                             .with_for_update().execution_options(populate_existing=True)).first()
 
         if not stock:
             raise HTTPException(status_code=404,detail="Produto fora de estoque")

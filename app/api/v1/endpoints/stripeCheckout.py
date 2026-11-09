@@ -148,6 +148,7 @@ def create_checkout(
                     select(Stock)
                     .where(Stock.product_id == product.id)
                     .with_for_update()
+                    .execution_options(populate_existing=True)
                 ).first()
                 if not stock:
                     raise HTTPException(
