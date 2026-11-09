@@ -1,0 +1,5 @@
+product_id,name,current_stock,confirmed_stock,category,packaged_weight_kg,packaged_width_cm,packaged_height_cm,packaged_length_cm,image_pending
+662bbc62-27f0-4b4e-9c5a-45a0f7c079cf,Lip Oil E.L.F Cosmetics Glow Reviver Plumping,0,,,,,,,False
+3ff609ff-a1f3-4666-bdea-8e15b414f702,Primer E.L.F Cosmetics Power Grip,0,,,,,,,False
+523b3e78-9bcc-4595-a50c-14447c158c15,Teste 1,0,,,,,,,True
+fb793152-0256-46e7-86dd-09aebc8fe4ae,Teste 2,0,,,,,,,False

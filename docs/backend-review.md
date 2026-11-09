@@ -58,5 +58,5 @@ homologada nesta revisao. As clausulas de bloqueio foram conferidas no dialeto
 PostgreSQL. Stripe, Melhor Envio e o envio real de email ainda dependem da
 homologacao e configuracao externas descritas em `storefront-review.md`.
 
-Estas alteracoes permanecem locais; nenhum deploy ou mudanca de variavel de
-producao foi realizado nesta revisao do backend.
+O codigo desta revisao foi incorporado a `main`. A situacao das configuracoes e
+das integracoes esta registrada em [integration-setup.md](integration-setup.md).
