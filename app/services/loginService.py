@@ -1,17 +1,17 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
+from uuid import UUID
 
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
-from sqlmodel import Session, select
 
 from app.core.db import Database
 from app.core.settings import settings
+from app.core.token_security import matches_password_fingerprint, password_fingerprint
 from app.models.user import UserInDB
-from app.schemas.user import TokenData
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -37,8 +37,10 @@ class LoginAndJWT:
         return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
     @staticmethod
-    def get_user(username: str, session: Session) -> UserInDB | None:
-        return session.exec(select(UserInDB).where(UserInDB.email == username)).first()
+    def create_user_access_token(user: UserInDB) -> str:
+        return LoginAndJWT.create_access_token({
+            'sub': str(user.id), 'pwd': password_fingerprint(user.hashed_password),
+        })
 
 
 async def get_current_user(
@@ -52,18 +54,16 @@ async def get_current_user(
     )
     try:
         payload: dict[str, Any] = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+            options={'require': ['exp', 'sub', 'type', 'pwd']},
         )
         if payload.get("type") != "access":
             raise credentials_exception
-        username: str | None = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except InvalidTokenError:
+        user_id = UUID(payload['sub'])
+    except (InvalidTokenError, ValueError, TypeError, AttributeError):
         raise credentials_exception
-    user = LoginAndJWT.get_user(username=token_data.username, session=session)
-    if user is None:
+    user = session.get(UserInDB, user_id)
+    if user is None or not matches_password_fingerprint(payload.get('pwd'), user.hashed_password):
         raise credentials_exception
     return user
 

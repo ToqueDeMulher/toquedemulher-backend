@@ -1,18 +1,19 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlencode
+from uuid import UUID
 
 import jwt
-from jwt.exceptions import InvalidTokenError
 
 from app.core.settings import ROOT_DIR, settings
+from app.core.token_security import EmailTokenData, decode_email_token
 from app.services.email_service import send_email
 
 
 TOKEN_TYPE = "email_confirmation"
 
 
-def create_email_confirmation_token(email: str) -> str:
+def create_email_confirmation_token(email: str, *, user_id: UUID) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.EMAIL_CONFIRMATION_EXPIRE_MINUTES
     )
@@ -20,25 +21,13 @@ def create_email_confirmation_token(email: str) -> str:
         "sub": email,
         "type": TOKEN_TYPE,
         "exp": expire,
+        "uid": str(user_id),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def verify_email_confirmation_token(token: str) -> str | None:
-    try:
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[settings.ALGORITHM],
-        )
-    except InvalidTokenError:
-        return None
-
-    if payload.get("type") != TOKEN_TYPE:
-        return None
-
-    email = payload.get("sub")
-    return str(email) if email else None
+def verify_email_confirmation_token(token: str) -> EmailTokenData | None:
+    return decode_email_token(token, TOKEN_TYPE)
 
 
 def build_email_confirmation_url(token: str) -> str:
@@ -64,8 +53,8 @@ def render_confirmation_template(confirmation_url: str, email: str) -> str:
     return html
 
 
-def send_confirmation_email(user_name: str, user_email: str) -> bool:
-    token = create_email_confirmation_token(user_email)
+def send_confirmation_email(user_name: str, user_email: str, user_id: UUID) -> bool:
+    token = create_email_confirmation_token(user_email, user_id=user_id)
     confirmation_url = build_email_confirmation_url(token)
     html_body = render_confirmation_template(confirmation_url, user_email)
     text_body = (

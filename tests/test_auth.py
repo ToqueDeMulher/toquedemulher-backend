@@ -156,6 +156,9 @@ def test_admin_can_upload_product_image(monkeypatch):
 def test_non_access_tokens_cannot_authenticate_protected_routes(token_kind):
     email = "admin@example.com"
     create_admin_token(email)
+    with Session(engine) as session:
+        user = session.exec(select(UserInDB).where(UserInDB.email == email)).one()
+        user_id, password_hash = user.id, user.hashed_password
     token = {
         "refresh": lambda: jwt.encode(
             {
@@ -166,8 +169,9 @@ def test_non_access_tokens_cannot_authenticate_protected_routes(token_kind):
             settings.SECRET_KEY,
             algorithm=settings.ALGORITHM,
         ),
-        "password_reset": lambda: create_password_reset_token(email),
-        "email_confirmation": lambda: create_email_confirmation_token(email),
+        "password_reset": lambda: create_password_reset_token(
+            email, user_id=user_id, password_hash=password_hash),
+        "email_confirmation": lambda: create_email_confirmation_token(email, user_id=user_id),
     }[token_kind]()
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -250,7 +254,7 @@ def test_register_queues_confirmation_email(monkeypatch):
 
     monkeypatch.setattr(
         "app.api.v1.endpoints.user.send_confirmation_email",
-        lambda name, email: sent_emails.append((name, email)) or True,
+        lambda name, email, user_id: sent_emails.append((name, email)) or True,
     )
 
     response = client.post(
@@ -277,7 +281,9 @@ def test_confirm_email_marks_user_as_confirmed():
         },
     )
 
-    token = create_email_confirmation_token(email)
+    with Session(engine) as session:
+        user_id = session.exec(select(UserInDB).where(UserInDB.email == email)).one().id
+    token = create_email_confirmation_token(email, user_id=user_id)
     response = client.post(
         "/api/v1/user/confirm-email",
         json={"token": token},
@@ -312,9 +318,11 @@ def test_login_can_require_confirmed_email(monkeypatch):
     )
     assert blocked_response.status_code == 403
 
+    with Session(engine) as session:
+        user_id = session.exec(select(UserInDB).where(UserInDB.email == email)).one().id
     client.post(
         "/api/v1/user/confirm-email",
-        json={"token": create_email_confirmation_token(email)},
+        json={"token": create_email_confirmation_token(email, user_id=user_id)},
     )
     login_response = client.post(
         "/api/v1/user/login",

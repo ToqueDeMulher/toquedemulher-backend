@@ -69,3 +69,7 @@ class GoogleLoginRequest(BaseModel):
 
 class ConfirmEmailRequest(BaseModel):
     token: str
+
+
+class ResendConfirmationRequest(BaseModel):
+    email: EmailStr

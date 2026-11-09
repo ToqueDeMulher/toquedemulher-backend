@@ -2,7 +2,7 @@ import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile, status
 from sqlmodel import select
 
 from app.api.dependencies import CurrentUser, addToDB
@@ -29,6 +29,7 @@ from app.schemas.user import (
     ConfirmEmailRequest,
     DeleteAccountRequest,
     GetUserResponse,
+    ResendConfirmationRequest,
     UserRequest,
 )
 from app.services.email_confirmation_service import (
@@ -36,6 +37,7 @@ from app.services.email_confirmation_service import (
     verify_email_confirmation_token,
 )
 from app.services.loginService import LoginAndJWT
+from app.services.brasil_api import check_rate_limit
 
 router = APIRouter(prefix="/user")
 
@@ -81,7 +83,7 @@ def create_user(
     )
 
     addToDB(db_user, session)
-    background_tasks.add_task(send_confirmation_email, db_user.name, db_user.email)
+    background_tasks.add_task(send_confirmation_email, db_user.name, db_user.email, db_user.id)
     return Message(
         mensagem="Usuario criado com sucesso. Verifique seu email para confirmar a conta."
     )
@@ -89,21 +91,31 @@ def create_user(
 
 @router.post("/confirm-email", response_model=Message, status_code=200)
 def confirm_email(payload: ConfirmEmailRequest, session: _SessionDep):
-    email = verify_email_confirmation_token(payload.token)
+    token_data = verify_email_confirmation_token(payload.token)
 
-    if not email:
+    if not token_data:
         raise HTTPException(status_code=400, detail="Token de confirmacao invalido")
 
-    db_user = session.exec(select(UserInDB).where(UserInDB.email == email)).first()
+    db_user = session.get(UserInDB, token_data.user_id)
 
-    if not db_user:
-        raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+    if not db_user or db_user.disabled or db_user.email != token_data.email:
+        raise HTTPException(status_code=400, detail="Token de confirmacao invalido")
 
     if db_user.email_confirmed_at is None:
         db_user.email_confirmed_at = utc_now()
         addToDB(db_user, session)
 
     return Message(mensagem="Email confirmado com sucesso")
+
+
+@router.post('/resend-confirmation', response_model=Message)
+def resend_confirmation(payload: ResendConfirmationRequest, request: Request,
+                        session: _SessionDep, background_tasks: BackgroundTasks):
+    check_rate_limit(request, 'email-confirmation')
+    user = session.exec(select(UserInDB).where(UserInDB.email == payload.email)).first()
+    if user and not user.disabled and user.email_confirmed_at is None:
+        background_tasks.add_task(send_confirmation_email, user.name, user.email, user.id)
+    return Message(mensagem='Se houver uma conta pendente, enviaremos um novo link de confirmacao.')
 
 
 @router.get("/me", response_model=GetUserResponse)
@@ -318,7 +330,8 @@ def change_user_information(
 
 
 @router.put("/me/email", response_model=Message)
-def change_email(data: ChangeEmailRequest, session: _SessionDep, user: CurrentUser):
+def change_email(data: ChangeEmailRequest, session: _SessionDep, user: CurrentUser,
+                 background_tasks: BackgroundTasks):
     db_user = session.get(UserInDB, user.id)
 
     if not db_user:
@@ -335,7 +348,10 @@ def change_email(data: ChangeEmailRequest, session: _SessionDep, user: CurrentUs
         raise HTTPException(status_code=400, detail="Email ja esta em uso")
 
     db_user.email = data.new_email
+    db_user.email_confirmed_at = None
+    db_user.updated_at = utc_now()
     addToDB(db_user, session)
+    background_tasks.add_task(send_confirmation_email, db_user.name, db_user.email, db_user.id)
 
     return Message(mensagem="Email atualizado com sucesso")
 
