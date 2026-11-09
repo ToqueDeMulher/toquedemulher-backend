@@ -37,8 +37,8 @@ def get_supabase_settings() -> SupabaseSettings:
 
     if not url or not key:
         raise HTTPException(
-            status_code=500,
-            detail="Supabase nao configurado. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.",
+            status_code=503,
+            detail="Armazenamento de imagens indisponivel. Tente novamente mais tarde.",
         )
 
     return SupabaseSettings(
@@ -52,9 +52,19 @@ def get_supabase_settings() -> SupabaseSettings:
 
 
 async def upload_to_supabase(*, product_id: UUID, file: UploadFile, extension: str) -> str:
+    return await _upload_image(owner_id=product_id, file=file, extension=extension)
+
+
+async def upload_avatar_to_supabase(*, user_id: UUID, file: UploadFile, extension: str) -> str:
+    return await _upload_image(owner_id=user_id, file=file, extension=extension, folder='avatars')
+
+
+async def _upload_image(*, owner_id: UUID, file: UploadFile, extension: str,
+                        folder: str | None = None) -> str:
     supabase_settings = get_supabase_settings()
 
-    file_key = f"{supabase_settings.folder}/{product_id}/{uuid4().hex}{extension}"
+    prefix = (folder if folder is not None else supabase_settings.folder).strip('/')
+    file_key = f"{prefix}/{owner_id}/{uuid4().hex}{extension}"
     upload_url = f"{supabase_settings.url}/storage/v1/object/{supabase_settings.bucket}/{file_key}"
 
     file_bytes = await read_upload_bytes(file=file, max_bytes=supabase_settings.max_upload_bytes)
@@ -65,12 +75,17 @@ async def upload_to_supabase(*, product_id: UUID, file: UploadFile, extension: s
         "Content-Type": file.content_type or "application/octet-stream",
     }
 
-    async with httpx.AsyncClient(timeout=supabase_settings.timeout) as client:
-        response = await client.post(upload_url, headers=headers, content=file_bytes)
+    try:
+        async with httpx.AsyncClient(timeout=supabase_settings.timeout) as client:
+            response = await client.post(upload_url, headers=headers, content=file_bytes)
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503, detail="Armazenamento de imagens indisponivel. Tente novamente."
+        ) from exc
 
     if response.status_code >= 400:
         raise HTTPException(
-            status_code=500,
+            status_code=502,
             detail="Falha ao enviar imagem para o armazenamento.",
         )
 
@@ -96,6 +111,9 @@ async def read_upload_bytes(*, file: UploadFile, max_bytes: int) -> bytes:
             )
 
         chunks.append(chunk)
+
+    if not total_size:
+        raise HTTPException(status_code=400, detail="Envie uma imagem com conteudo.")
 
     return b"".join(chunks)
 

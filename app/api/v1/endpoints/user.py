@@ -1,7 +1,3 @@
-import os
-import uuid
-from pathlib import Path
-
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile, status
 from sqlmodel import select
 
@@ -37,13 +33,12 @@ from app.services.email_confirmation_service import (
     verify_email_confirmation_token,
 )
 from app.services.loginService import LoginAndJWT
+from app.services.service import upload_avatar_to_supabase
 from app.services.brasil_api import check_rate_limit
 
 router = APIRouter(prefix="/user")
 
-ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
-ALLOWED_AVATAR_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-STATIC_DIR = Path(__file__).resolve().parents[4] / "static"
+ALLOWED_AVATAR_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 
 
 def _to_user_response(db_user: UserInDB) -> GetUserResponse:
@@ -129,7 +124,7 @@ def get_user(session: _SessionDep, user: CurrentUser):
 
 
 @router.post("/me/avatar", response_model=GetUserResponse)
-def upload_avatar(
+async def upload_avatar(
     session: _SessionDep,
     user: CurrentUser,
     file: UploadFile = File(...),
@@ -140,30 +135,14 @@ def upload_avatar(
             detail="Formato de imagem invalido. Use JPEG, PNG ou WebP.",
         )
 
-    original_name = os.path.basename(file.filename or "")
-    _, ext = os.path.splitext(original_name)
-    ext = ext.lower()
-
-    if ext not in ALLOWED_AVATAR_EXTENSIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Extensao de arquivo invalida.",
-        )
-
     db_user = session.get(UserInDB, user.id)
 
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario nao encontrado")
 
-    avatar_dir = STATIC_DIR / "uploads" / "avatars"
-    avatar_dir.mkdir(parents=True, exist_ok=True)
-
-    filename = f"{uuid.uuid4()}{ext}"
-
-    with open(avatar_dir / filename, "wb") as buffer:
-        buffer.write(file.file.read())
-
-    db_user.avatar_url = f"/static/uploads/avatars/{filename}"
+    db_user.avatar_url = await upload_avatar_to_supabase(
+        user_id=user.id, file=file, extension=ALLOWED_AVATAR_TYPES[file.content_type])
+    db_user.updated_at = utc_now()
     addToDB(db_user, session)
 
     return _to_user_response(db_user)
