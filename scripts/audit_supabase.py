@@ -19,8 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import app.models  # noqa: E402, F401
-from app.core.database_url import resolve_database_url  # noqa: E402
-from scripts.check_supabase_connection import EnvSettings  # noqa: E402
+from app.core.database_url import database_engine_options, resolve_database_url  # noqa: E402
+from scripts.check_supabase_connection import EnvSettings, connection_error_hint  # noqa: E402
 
 
 def sql_literal(value: object) -> str:
@@ -178,6 +178,14 @@ SELECT DISTINCT * FROM findings ORDER BY issue, table_name, name;
 """
 
 
+def missing_stock_findings(connection) -> list[dict[str, str]]:
+    return [dict(issue='missing_product_stock', table_name='stock',
+                 name=str(product_id), detail='Product has no stock record')
+            for product_id in connection.execute(text(
+                'SELECT p.id FROM product p WHERE NOT EXISTS '
+                '(SELECT 1 FROM stock s WHERE s.product_id = p.id)')).scalars()]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--export-sql', type=Path)
@@ -190,21 +198,22 @@ def main() -> int:
         return 0
 
     load_dotenv(ROOT / '.env')
+    engine = None
     try:
-        url = resolve_database_url(EnvSettings())
-    except RuntimeError:
-        print('Configure DATABASE_URL ou SUPABASE_DB_PASSWORD no .env.', file=sys.stderr)
-        return 2
-    if not url.startswith('postgresql'):
-        print('Este diagnostico exige uma conexao PostgreSQL/Supabase.', file=sys.stderr)
-        return 2
-    engine = create_engine(url, connect_args={'connect_timeout': 10}, echo=False)
-    try:
+        settings = EnvSettings()
+        url = resolve_database_url(settings)
+        if not url.startswith('postgresql'):
+            print('Este diagnostico exige uma conexao PostgreSQL/Supabase.', file=sys.stderr)
+            return 2
+        engine = create_engine(url, **database_engine_options(
+            url, pool_mode='null', connect_timeout=settings.DB_CONNECT_TIMEOUT))
         with engine.connect() as connection:
             with connection.begin():
                 connection.execute(text('SET TRANSACTION READ ONLY'))
                 connection.execute(text("SET LOCAL statement_timeout = '30s'"))
                 findings = [dict(row) for row in connection.execute(text(sql)).mappings()]
+                if not findings:
+                    findings.extend(missing_stock_findings(connection))
                 migration_table = connection.scalar(text(
                     "SELECT to_regclass('supabase_migrations.schema_migrations')"))
                 if migration_table:
@@ -232,11 +241,12 @@ def main() -> int:
         return 1 if findings else 0
     except Exception as error:
         # Exception text may contain connection strings or other credentials.
-        print(f'Falha no diagnostico ({type(error).__name__}); confira acesso e permissoes.',
+        print(f'Falha no diagnostico ({type(error).__name__}). {connection_error_hint(error)}',
               file=sys.stderr)
         return 2
     finally:
-        engine.dispose()
+        if engine is not None:
+            engine.dispose()
 
 
 if __name__ == '__main__':
