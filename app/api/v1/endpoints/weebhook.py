@@ -9,8 +9,8 @@ from app.core.db import _SessionDep
 from app.core.settings import settings
 from app.core.time import utc_now
 from app.models.payment import Payment, PaymentStatus
+from app.services.abacatepay import cents
 from app.services.paymentStockService import release_checkout_stock
-
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -52,36 +52,18 @@ def _metadata_order_id(data) -> UUID | None:
 
 
 def _find_payment(event_type: str, data, session: _SessionDep) -> Payment | None:
-    payment = None
-
-    if event_type in _CHECKOUT_EVENTS:
-        checkout_session_id = _object_value(data, "id")
-        if checkout_session_id:
-            payment = session.exec(
-                select(Payment)
-                .where(Payment.provider_session_id == checkout_session_id)
-                .with_for_update()
-            ).first()
-    elif event_type == "charge.refunded":
-        payment_intent_id = _object_value(data, "payment_intent")
-        if payment_intent_id:
-            payment = session.exec(
-                select(Payment)
-                .where(Payment.provider_payment_id == payment_intent_id)
-                .with_for_update()
-            ).first()
-
-    if payment:
-        return payment
-
-    order_id = _metadata_order_id(data)
-    if not order_id:
+    field, identifier = (
+        (Payment.provider_session_id, _object_value(data, "id"))
+        if event_type in _CHECKOUT_EVENTS
+        else (Payment.provider_payment_id, _object_value(data, "payment_intent"))
+    )
+    if not identifier:
         return None
-
     return session.exec(
         select(Payment)
-        .where(Payment.order_id == order_id)
+        .where(Payment.provider == "stripe", field == identifier)
         .with_for_update()
+        .execution_options(populate_existing=True)
     ).first()
 
 
@@ -107,9 +89,7 @@ def _can_transition(current_status: str, target_status: str) -> bool:
         return False
     if current_status == PaymentStatus.APPROVED.value:
         return target_status == PaymentStatus.REFUNDED.value
-    if current_status in _FINAL_FAILURE_STATUSES:
-        return False
-    return True
+    return current_status not in _FINAL_FAILURE_STATUSES
 
 
 @router.post("/payments/webhook")
@@ -153,6 +133,14 @@ async def stripe_webhook(request: Request, session: _SessionDep):
                     raise HTTPException(503, "Pedido ainda não disponível. Reenvie o evento.")
                 return {"status": "ignored", "reason": "payment não encontrado"}
 
+            if target_status in {PaymentStatus.APPROVED.value, PaymentStatus.REFUNDED.value}:
+                amount_field = "amount_total" if event_type in _CHECKOUT_EVENTS else "amount_refunded"
+                if (
+                    _object_value(data, amount_field) != cents(payment.amount)
+                    or _object_value(data, "currency") != payment.currency.lower()
+                ):
+                    raise HTTPException(400, "Valor ou moeda não confere")
+
             current_status = str(payment.status)
             if not _can_transition(current_status, target_status):
                 return {
@@ -187,9 +175,10 @@ async def stripe_webhook(request: Request, session: _SessionDep):
         raise
     except Exception as exc:
         session.rollback()
-        logger.exception(
-            "Erro ao processar webhook Stripe: event_type=%s",
+        logger.error(
+            "Falha no webhook Stripe: event_type=%s erro=%s",
             event_type,
+            type(exc).__name__,
         )
         raise HTTPException(
             status_code=500,

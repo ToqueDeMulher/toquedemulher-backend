@@ -14,7 +14,7 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python scripts/check_supabase_connection.py
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --no-access-log
 ```
 
 A API fica em:
@@ -37,14 +37,15 @@ Variaveis de ambiente sao carregadas na inicializacao do processo.
 | Pydantic v2 | 2.11 | Validação de dados |
 | PyJWT | 2.10 | Tokens de acesso |
 | Passlib (bcrypt) | 1.7 | Hash seguro de senhas |
-| Stripe | 14.4 | Checkout e webhook de pagamento |
+| AbacatePay | API v2 | Pix e checkout hospedado para cartão |
+| Stripe | 14.4 | Conciliação do legado e rollback temporário |
 
 ## Funcionalidades
 
 - **Autenticação:** Registro, login por senha ou Google, confirmação de email e recuperação de senha
 - **Usuários:** Perfil, endereços, métodos de pagamento, avatar e consulta de pedidos
 - **Produtos:** Cadastro administrativo, imagens, fornecedores e estoque
-- **Pagamentos:** Checkout Stripe com reserva de estoque e webhook assinado
+- **Pagamentos:** Pix e cartão via AbacatePay com reserva de estoque e conciliação autenticada. Veja a [configuração de pagamentos](docs/abacatepay.md).
 - **Frete:** Cotação, conexão administrativa e remessas via Melhor Envio
 - **Emails:** Confirmação de email e redefinição de senha
 - **Admin:** Dashboard e rotas protegidas de gestão
@@ -299,7 +300,7 @@ static/uploads/      Arquivos servidos localmente em desenvolvimento
 
 ## Fretes: Melhor Envio e BrasilAPI
 
-O carrinho e o Stripe Checkout usam cotações reais do Melhor Envio. O painel
+O carrinho e o checkout usam cotações do Melhor Envio. O painel
 `/admin/envios` conecta a conta por OAuth e permite preparar, pagar, gerar,
 imprimir e acompanhar etiquetas. A BrasilAPI preenche os endereços por CEP.
 

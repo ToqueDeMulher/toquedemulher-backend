@@ -161,7 +161,7 @@ def list_shipments(session: _SessionDep, user: AdminUser):
     ]
 
 
-def owned_shipment(order_id, session, user, *, admin=False):
+def owned_shipment(order_id, session, user, *, admin=False, lock_payment=False):
     payment = session.exec(select(Payment).where(Payment.order_id == order_id)).first()
     if not payment or (not admin and payment.user_id != user.id):
         raise HTTPException(404, "Pedido não encontrado")
@@ -170,6 +170,8 @@ def owned_shipment(order_id, session, user, *, admin=False):
     ).first()
     if not shipment:
         raise HTTPException(404, "Este pedido não possui envio integrado")
+    if lock_payment:
+        session.refresh(payment, with_for_update=True)
     quote = session.get(ShippingQuote, shipment.quote_id)
     if quote.environment != me.environment():
         raise HTTPException(409, "Envio de outro ambiente Melhor Envio")
@@ -202,7 +204,7 @@ def prepare(
     session: _SessionDep,
     user: AdminUser,
 ):
-    shipment, payment = owned_shipment(order_id, session, user, admin=True)
+    shipment, payment = owned_shipment(order_id, session, user, admin=True, lock_payment=True)
     operations.prepare(session, shipment, payment, payload.invoice_key)
     return me.shipment_out(shipment, payment, admin=True)
 
@@ -265,7 +267,7 @@ def reconcile(
 
 @router.post("/admin/shipments/{order_id}/{action}")
 def shipment_action(order_id: UUID, action: str, session: _SessionDep, user: AdminUser):
-    shipment, payment = owned_shipment(order_id, session, user, admin=True)
+    shipment, payment = owned_shipment(order_id, session, user, admin=True, lock_payment=action == "pay")
     if action == "sync":
         operations.refresh(session, shipment)
     elif action == "pay":

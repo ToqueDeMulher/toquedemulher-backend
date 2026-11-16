@@ -13,7 +13,8 @@ __pycache__
 !.env.example
 tests/
 docs/
-scripts/
+scripts/*
+!scripts/reconcile_abacatepay.py
 README.md
 Dockerfile
 .dockerignore

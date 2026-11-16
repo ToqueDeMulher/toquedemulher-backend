@@ -825,7 +825,7 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
         return FakeStripeSession()
 
     monkeypatch.setattr(
-        "app.api.v1.endpoints.stripeCheckout.create_checkout_session",
+        "app.api.v1.endpoints.payments.create_checkout_session",
         fake_create_checkout_session,
     )
 
@@ -966,7 +966,7 @@ def test_stripe_checkout_uses_database_product_and_returns_checkout_url(monkeypa
         assert movement.order_id == payment.order_id
 
     monkeypatch.setattr(
-        "app.api.v1.endpoints.stripeCheckout.retrieve_checkout_session",
+        "app.api.v1.endpoints.payments.retrieve_checkout_session",
         lambda session_id: FakeStripeSession(),
     )
     duplicate_response = client.post(

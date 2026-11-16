@@ -1,6 +1,6 @@
 # Melhor Envio e BrasilAPI
 
-Integração da API ativa do FastAPI, carrinho e Stripe Checkout. O frete é cotado
+Integração da API ativa do FastAPI, carrinho e checkout AbacatePay. O frete é cotado
 pelo backend com preços, pesos e dimensões dos produtos cadastrados. O navegador
 envia o ID da cotação e o serviço escolhido; não define o valor do frete.
 
@@ -42,7 +42,7 @@ Referências oficiais:
 
    Preencha o User-Agent com `Toque de Mulher (seu-email-de-contato)`.
    `FRONTEND_URL` deve usar a porta real do frontend; configure também os retornos
-   Stripe e `CORS_ORIGINS`. Não use variáveis `VITE_` para as credenciais.
+   pagamento e `CORS_ORIGINS` (veja [AbacatePay](abacatepay.md)). Não use variáveis `VITE_` para as credenciais.
 
    `MELHOR_ENVIO_SENDER` é um JSON em uma única linha com os dados reais da loja:
 
@@ -76,8 +76,8 @@ Referências oficiais:
    preenchimento manual. No cadastro de endereços, a mesma API substitui o ViaCEP.
 5. Na etapa de pagamento, confirme a entrega, nome, e-mail, telefone completo e CPF
    do destinatário. CPF é validado no backend; esses dados ficam no snapshot do envio.
-6. A Stripe recebe produtos com seus preços reais e uma linha de frete quando há
-   cobrança. O pagamento registrado inclui esse frete. Endereço alterado, cotação
+6. A AbacatePay recebe o total em centavos, calculado com os preços do catálogo e o
+   frete escolhido. Endereço alterado, cotação
    expirada, serviço fora da cotação ou mudança nos produtos exige nova cotação.
    Alterações em itens, quantidade ou preço invalidam a seleção no navegador.
 7. O perfil apresenta serviço, prazo após postagem, status e códigos de rastreio.
@@ -89,13 +89,13 @@ como fallback quando o provedor está indisponível.
 
 ## Fluxo administrativo
 
-1. Aguarde o webhook Stripe confirmar o pagamento do pedido.
+1. Aguarde o backend confirmar o pagamento na AbacatePay.
 2. Informe a chave de NF-e (44 dígitos) e clique em **Preparar etiquetas**.
    O envio comercial usa `non_commercial=false`; não substitui NF-e por declaração.
    O cadastro utiliza remetente e destinatário salvos, produtos declarados e os
    pacotes retornados pela cotação.
 3. Clique em **Pagar ... da carteira**. Essa ação compra o frete usando o saldo da
-   conta Melhor Envio. O pagamento da etiqueta é distinto do pagamento Stripe do
+   conta Melhor Envio. O pagamento da etiqueta é distinto do pagamento do
    cliente; é necessário saldo na carteira do ambiente escolhido.
 4. Clique em **Gerar etiquetas**. A geração é assíncrona.
 5. Consulte o status até aparecer **Pronto para postagem** e clique em

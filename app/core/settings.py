@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -8,7 +9,6 @@ from app.core.database_url import (
     database_engine_options,
     resolve_database_url,
 )
-
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 ENV_FILE_PATH = ROOT_DIR / ".env"
@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     SUPABASE_TIMEOUT: float = 20.0
     PRODUCT_IMAGE_MAX_BYTES: int = 5 * 1024 * 1024
     CREATE_TABLES_ON_STARTUP: bool = False
+
+    PAYMENT_PROVIDER: Literal["abacatepay", "stripe"] = "abacatepay"
+    ABACATEPAY_API_KEY: str = ""
+    ABACATEPAY_WEBHOOK_SECRET: str = ""
+    ABACATEPAY_DEV_MODE: bool = True
+    ABACATEPAY_CARD_ENABLED: bool = False
 
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
