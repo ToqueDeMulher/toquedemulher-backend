@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 from fastapi import HTTPException
 from app.core.time import utc_now
 from app.models.shipping import ShippingQuote
+from app.services import abacatepay
 from app.services import melhor_envio as me
 
 PAID_STATUSES = {
@@ -41,6 +42,15 @@ def enforce_payment_environment(payment):
         raise HTTPException(409, "Pagamento de teste não libera envio de produção")
 
 
+def verify_fulfillment_payment(session, payment):
+    if payment.provider == abacatepay.PROVIDER and payment.status == "approved":
+        # Revalidate at fulfillment even when the refund webhook never arrived.
+        abacatepay.reconcile(session, payment)
+        if payment.status != "approved":
+            session.commit()
+            raise HTTPException(409, "Pagamento indisponível para envio. Atualize o pedido.")
+
+
 def prepare(session, shipment, payment, invoice_key):
     if shipment.status != "pending":
         raise HTTPException(
@@ -49,6 +59,7 @@ def prepare(session, shipment, payment, invoice_key):
     if str(payment.status) != "approved":
         raise HTTPException(409, "Aguarde a confirmação do pagamento do pedido")
     enforce_payment_environment(payment)
+    verify_fulfillment_payment(session, payment)
     quote = session.get(ShippingQuote, shipment.quote_id)
     if quote.environment != me.environment():
         raise HTTPException(409, "Este envio pertence a outro ambiente Melhor Envio")
@@ -239,6 +250,7 @@ def pay(session, shipment, payment):
     if str(payment.status) != "approved":
         raise HTTPException(409, "Pedido ainda não está pago")
     enforce_payment_environment(payment)
+    verify_fulfillment_payment(session, payment)
     if shipment.status != "carted":
         raise HTTPException(
             409, "Atualize o status: a etiqueta deve estar no carrinho para ser paga"
