@@ -27,6 +27,18 @@ jobs:
   test:
     name: Backend Unit Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.12
+        env:
+          POSTGRES_USER: tdm_fixture
+          POSTGRES_PASSWORD: fixture_only
+          POSTGRES_DB: tdm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tdm_fixture -d tdm_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,11 +53,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest httpx
+          pip install -r requirements-test.txt
 
       - name: Run unit tests
         env:
-          SECRET_KEY: "test-secret"
+          SECRET_KEY: "fixture-only-jwt-key-with-at-least-32-characters"
+          TDM_TEST_POSTGRES_URL: "postgresql://tdm_fixture:fixture_only@127.0.0.1:5432/tdm_test"
           STRIPE_SECRET_KEY: "sk_test"
           STRIPE_WEBHOOK_SECRET: "whsec_test"
-        run: pytest tests/ -v
+        run: pytest tests/ --cov=app --cov-report=term --cov-report=xml
+      - name: Lint release test modules
+        run: ruff check tests/test_abacatepay.py tests/test_email_security.py tests/test_service_units.py tests/test_postgres_concurrency.py tests/e2e_server.py app/services/abacatepay.py app/api/v1/endpoints/abacatepay_webhook.py
+      - name: Audit runtime dependencies
+        run: pip-audit --disable-pip --no-deps -r requirements.txt
