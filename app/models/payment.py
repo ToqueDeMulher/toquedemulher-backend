@@ -28,6 +28,9 @@ class Payment(SQLModel, table=True):
     __tablename__ = "payment"
     __table_args__ = (
         CheckConstraint('amount >= 0', name='ck_payment_amount_non_negative'),
+        CheckConstraint(
+            'discount_amount >= 0', name='ck_payment_discount_amount_non_negative'
+        ),
     )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -55,6 +58,11 @@ class Payment(SQLModel, table=True):
     status: str = Field(default=PaymentStatus.PENDING.value, nullable=False, index=True)
     payer_email: str = Field(nullable=False, max_length=255)
     amount: Decimal = Field(sa_column=Column(Numeric(10, 2), nullable=False))
+    coupon_id: int | None = Field(default=None, foreign_key="coupon.id", index=True)
+    discount_amount: Decimal = Field(
+        default=Decimal("0.00"),
+        sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
+    )
     currency: str = Field(default="BRL", nullable=False, max_length=10)
     provider_session_id: str | None = Field(default=None, max_length=255, index=True)
     provider_payment_id: str | None = Field(default=None, max_length=255, index=True)

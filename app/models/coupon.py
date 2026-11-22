@@ -10,12 +10,19 @@ class Coupon(SQLModel, table=True):
     __tablename__ = "coupon"
     __table_args__ = (
         CheckConstraint("discount_value >= 0", name="ck_coupon_discount_value_non_negative"),
+        CheckConstraint(
+            "discount_type IN ('percent', 'fixed')", name="ck_coupon_discount_type"
+        ),
+        CheckConstraint(
+            "discount_type <> 'percent' OR discount_value <= 100",
+            name="ck_coupon_percent_at_most_100",
+        ),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     code: str = Field(unique=True, index=True)
     description: Optional[str] = None
-    discount_type: str
+    discount_type: str  # "percent" ou "fixed" (valor em reais)
     discount_value: float
 
     valid_from: Optional[datetime] = None
