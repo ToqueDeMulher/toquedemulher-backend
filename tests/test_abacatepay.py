@@ -413,3 +413,261 @@ def test_card_details_reject_redirect_to_an_untrusted_origin():
             payment, {"url": "https://app.abacatepay.com.evil.test/pay/bill_x"}
         )
     assert rejected.value.status_code == 502
+
+
+@pytest.mark.parametrize("method", ["PIX", "CARD"])
+def test_production_approves_only_matching_live_charge(monkeypatch, method):
+    from decimal import Decimal
+
+    monkeypatch.setattr(settings, "ABACATEPAY_DEV_MODE", False)
+    identifier = "bill_live_fixture" if method == "CARD" else "pix_char_live_fixture"
+    payment = Payment(
+        provider="abacatepay",
+        provider_method=method,
+        provider_dev_mode=False,
+        provider_session_id=identifier,
+        amount=Decimal("68.50"),
+        currency="BRL",
+        status="pending",
+    )
+    remote = {
+        "id": identifier,
+        "amount": 6850,
+        "paidAmount": 6850,
+        "status": "PAID",
+        "devMode": False,
+        "currency": "BRL",
+    }
+    with Session(engine) as session:
+        abacatepay.apply_remote(session, payment, remote)
+        assert payment.status == "approved"
+        assert payment.provider_payment_id == identifier
+
+
+@pytest.mark.parametrize(
+    "invalid_field,invalid_value",
+    [
+        ("devMode", True),
+        ("amount", 1),
+        ("paidAmount", 1),
+        ("currency", "USD"),
+        ("id", "bill_different_order"),
+    ],
+)
+def test_production_rejects_mismatched_card_before_approval(
+    monkeypatch, invalid_field, invalid_value
+):
+    from decimal import Decimal
+
+    monkeypatch.setattr(settings, "ABACATEPAY_DEV_MODE", False)
+    payment = Payment(
+        provider="abacatepay",
+        provider_method="CARD",
+        provider_dev_mode=False,
+        provider_session_id="bill_live_fixture",
+        amount=Decimal("68.50"),
+        currency="BRL",
+        status="pending",
+    )
+    remote = {
+        "id": "bill_live_fixture",
+        "amount": 6850,
+        "paidAmount": 6850,
+        "status": "PAID",
+        "devMode": False,
+        "currency": "BRL",
+        invalid_field: invalid_value,
+    }
+    with Session(engine) as session:
+        with pytest.raises(HTTPException) as rejected:
+            abacatepay.apply_remote(session, payment, remote)
+        assert rejected.value.status_code == 502
+        assert payment.status == "pending"
+
+
+def test_production_rejects_signed_dev_mode_webhook(monkeypatch, provider):
+    monkeypatch.setattr(settings, "ABACATEPAY_DEV_MODE", False)
+    assert deliver(dev_mode=True).status_code == 400
+
+
+def test_production_cannot_query_existing_dev_mode_payment(monkeypatch):
+    monkeypatch.setattr(settings, "ABACATEPAY_DEV_MODE", False)
+
+    def unexpected_request(*args, **kwargs):
+        pytest.fail("A Dev Mode payment must be rejected before gateway access")
+
+    monkeypatch.setattr(abacatepay.httpx, "request", unexpected_request)
+    payment = Payment(provider_method="PIX", provider_dev_mode=True)
+    with pytest.raises(HTTPException) as rejected:
+        abacatepay.lookup(payment)
+    assert rejected.value.status_code == 503
+
+
+@pytest.mark.parametrize("action", ["prepare", "pay"])
+def test_lost_refund_webhook_cannot_release_fulfillment(monkeypatch, provider, action):
+    remote, _ = provider
+    payload, headers = make_order(monkeypatch)
+    created = client.post(CHECKOUT, json=payload, headers=headers).json()
+    remote["status"] = "PAID"
+    assert deliver().json()["status"] == "approved"
+    with Session(engine) as session:
+        shipment = session.exec(select(Shipment)).one()
+        shipment.status = "pending" if action == "prepare" else "carted"
+        session.commit()
+    remote["status"] = "REFUNDED"
+    admin = {"Authorization": f"Bearer {create_admin_token()}"}
+    response = client.post(
+        f"/api/v1/shipping/admin/shipments/{created['order_id']}/{action}",
+        json={"invoice_key": "1" * 44} if action == "prepare" else None,
+        headers=admin,
+    )
+    assert response.status_code == 409
+    with Session(engine) as session:
+        assert session.exec(select(Payment)).one().status == "refunded"
+
+
+@pytest.mark.parametrize("status", [401, 403, 429, 500, 502, 503])
+def test_gateway_http_failure_keeps_durable_reservation_and_no_approval(
+    monkeypatch, provider, status
+):
+    _, state = provider
+    payload, headers = make_order(monkeypatch)
+
+    def failure(method, url, **kwargs):
+        return httpx.Response(
+            status,
+            json={"error": "dummy provider failure"},
+            request=httpx.Request(method, url),
+        )
+
+    monkeypatch.setattr(abacatepay.httpx, "request", failure)
+    assert client.post(CHECKOUT, json=payload, headers=headers).status_code == 502
+    with Session(engine) as session:
+        payment = session.exec(select(Payment)).one()
+        assert payment.status == "pending"
+        assert payment.provider_creation_started is True
+        assert session.exec(select(Stock)).one().total_quantity == 19
+    assert state["posts"] == []
+
+
+def test_database_failure_during_confirmation_can_be_reprocessed(monkeypatch, provider):
+    from sqlalchemy.exc import OperationalError
+
+    remote, _ = provider
+    payload, headers = make_order(monkeypatch)
+    client.post(CHECKOUT, json=payload, headers=headers)
+    remote["status"] = "PAID"
+    original_commit = Session.commit
+
+    def interrupted_commit(session):
+        raise OperationalError(
+            "fixture transaction", {}, Exception("dummy database outage")
+        )
+
+    with monkeypatch.context() as broken:
+        broken.setattr(Session, "commit", interrupted_commit)
+        assert deliver().status_code == 503
+    with Session(engine) as session:
+        assert session.exec(select(Payment)).one().status == "pending"
+    assert Session.commit is original_commit
+    assert deliver().json()["status"] == "approved"
+    assert deliver().json()["status"] == "approved"
+    with Session(engine) as session:
+        assert session.exec(select(Stock)).one().total_quantity == 19
+
+
+@pytest.mark.parametrize(
+    "path,error",
+    [("products/get", "Product not found"), ("checkouts/get", "Billing not found")],
+)
+def test_gateway_lookup_recognizes_documented_missing_resource(
+    monkeypatch, provider, path, error
+):
+    def missing(method, url, **kwargs):
+        return httpx.Response(
+            400,
+            json={"success": False, "error": error},
+            request=httpx.Request(method, url),
+        )
+
+    monkeypatch.setattr(abacatepay.httpx, "request", missing)
+    assert abacatepay._request("GET", path, allow_missing=True) is None
+    with pytest.raises(HTTPException):
+        abacatepay._request("GET", path, allow_missing=False)
+
+
+@pytest.mark.parametrize(
+    "body", [b"{}", b"[]", b"null", b"invalid-json", b'{"event": 1}']
+)
+def test_webhook_rejects_signed_malformed_payload(monkeypatch, provider, body):
+    signature = base64.b64encode(hmac.digest(SIGNING_KEY, body, "sha256")).decode()
+    response = client.post(
+        WEBHOOK,
+        content=body,
+        headers={
+            "X-Webhook-Secret": "dummy-webhook-secret",
+            "X-Webhook-Signature": signature,
+        },
+    )
+    assert response.status_code == 400
+
+
+def test_webhook_header_secret_and_conflicting_query(monkeypatch, provider):
+    body = json.dumps({"event": "unsupported.event"}).encode()
+    headers = {
+        "X-Webhook-Secret": "dummy-webhook-secret",
+        "X-Webhook-Signature": base64.b64encode(
+            hmac.digest(SIGNING_KEY, body, "sha256")
+        ).decode(),
+    }
+    assert client.post(WEBHOOK, content=body, headers=headers).json() == {
+        "status": "ignored"
+    }
+    assert (
+        client.post(
+            WEBHOOK, params={"webhookSecret": "wrong"}, content=body, headers=headers
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            WEBHOOK,
+            params=[
+                ("webhookSecret", "dummy-webhook-secret"),
+                ("webhookSecret", "wrong"),
+            ],
+            content=body,
+            headers=headers,
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(WEBHOOK, content=b"x" * 65537, headers=headers).status_code == 413
+    )
+
+
+@pytest.mark.parametrize("action", ["prepare", "pay"])
+def test_provider_outage_blocks_fulfillment_of_approved_order(
+    monkeypatch, provider, action
+):
+    remote, state = provider
+    payload, headers = make_order(monkeypatch)
+    order = client.post(CHECKOUT, json=payload, headers=headers).json()
+    remote["status"] = "PAID"
+    assert deliver().json()["status"] == "approved"
+    with Session(engine) as session:
+        shipment = session.exec(select(Shipment)).one()
+        shipment.status = "pending" if action == "prepare" else "carted"
+        session.commit()
+    state["down"] = True
+    admin = {"Authorization": f"Bearer {create_admin_token()}"}
+    result = client.post(
+        f"/api/v1/shipping/admin/shipments/{order['order_id']}/{action}",
+        json={"invoice_key": "1" * 44} if action == "prepare" else None,
+        headers=admin,
+    )
+    assert result.status_code == 502
+    with Session(engine) as session:
+        assert session.exec(select(Shipment)).one().status == (
+            "pending" if action == "prepare" else "carted"
+        )
