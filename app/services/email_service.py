@@ -1,4 +1,5 @@
 import smtplib
+from html import escape
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
@@ -47,6 +48,7 @@ def send_email(
 def send_password_reset_email(user_email: str, user_name: str, reset_token: str) -> bool:
     """Envia email de redefinição de senha."""
     reset_url = f"{settings.FRONTEND_URL}/redefinir-senha?token={reset_token}"
+    first_name = escape(user_name.split()[0]) if user_name.split() else "cliente"
     subject = "Redefinição de Senha - O Toque de Mulher"
     html_body = f"""
     <html>
@@ -55,7 +57,7 @@ def send_password_reset_email(user_email: str, user_name: str, reset_token: str)
             <h1 style="color: white; margin: 0;">O Toque de Mulher</h1>
         </div>
         <div style="padding: 30px;">
-            <h2>Olá, {user_name.split()[0]}!</h2>
+            <h2>Olá, {first_name}!</h2>
             <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
             <p>Clique no botão abaixo para criar uma nova senha. Este link é válido por <strong>1 hora</strong>.</p>
             <div style="text-align: center; margin: 30px 0;">

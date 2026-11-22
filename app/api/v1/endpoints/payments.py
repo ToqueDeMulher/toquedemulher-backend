@@ -1,4 +1,6 @@
 import logging
+import time
+from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID, uuid4
 
@@ -83,12 +85,45 @@ def _existing_checkout_response(payment: Payment) -> CheckoutResponse:
     return _checkout_response(stripe_session, payment.order_id)
 
 
+# A emissão grava a intenção e reabre a trava antes de chamar a AbacatePay.
+# Uma repetição que entre nesse intervalo deve esperar, não responder 502.
+EMISSION_HANDOFF_GRACE = timedelta(milliseconds=500)
+
+
+def _emission_in_flight(payment: Payment) -> bool:
+    return (
+        payment.status == PaymentStatus.PENDING.value
+        and bool(payment.provider_creation_started)
+        and not payment.provider_session_id
+        and payment.provider_checkout_details is None
+        and payment.provider_checked_at is not None
+        and utc_now() - abacatepay.aware(payment.provider_checked_at)
+        < EMISSION_HANDOFF_GRACE
+    )
+
+
+def _lock_after_emission_handoff(session: Session, order_id: UUID) -> Payment | None:
+    deadline = time.monotonic() + EMISSION_HANDOFF_GRACE.total_seconds()
+    while True:
+        payment = abacatepay.payment_for_update(session, order_id)
+        if (
+            not payment
+            or not _emission_in_flight(payment)
+            or time.monotonic() >= deadline
+        ):
+            return payment
+        # Libera a trava para a emissão em andamento retomá-la; a próxima
+        # leitura espera até ela gravar o resultado.
+        session.commit()
+        time.sleep(0.02)
+
+
 def _continue_checkout(session: Session, payment: Payment) -> CheckoutResponse:
     if payment.provider == "stripe":
         return _existing_checkout_response(payment)
 
     order_id = payment.order_id
-    payment = abacatepay.payment_for_update(session, order_id)
+    payment = _lock_after_emission_handoff(session, order_id)
     if not payment:
         raise HTTPException(404, "Pagamento não encontrado")
 
