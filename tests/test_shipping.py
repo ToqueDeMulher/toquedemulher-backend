@@ -131,7 +131,7 @@ def checkout(monkeypatch, product_id, quote, service_id=3):
         return {"id": "cs_shipping_test", "url": "https://checkout.stripe.com/test"}
 
     monkeypatch.setattr(
-        "app.api.v1.endpoints.stripeCheckout.create_checkout_session", fake_stripe
+        "app.api.v1.endpoints.payments.create_checkout_session", fake_stripe
     )
     payload = {
         "address_id": address_id,

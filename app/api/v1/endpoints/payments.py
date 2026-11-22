@@ -1,8 +1,8 @@
 import logging
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
@@ -15,11 +15,14 @@ from app.models.payment import Payment, PaymentStatus
 from app.models.paymentItem import PaymentItem
 from app.models.product import Product
 from app.models.stock import Stock
+from app.models.user import UserInDB
 from app.schemas.create_checkout import (
     CheckoutResponse,
     CheckoutStatusResponse,
     CreateCheckoutRequest,
 )
+from app.services import abacatepay
+from app.services import melhor_envio as shipping_service
 from app.services.checkoutService import (
     create_checkout_session,
     expire_checkout_session,
@@ -27,7 +30,6 @@ from app.services.checkoutService import (
 )
 from app.services.paymentStockService import release_checkout_stock
 from app.services.stockService import StockService
-from app.services import melhor_envio as shipping_service
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +70,10 @@ def _existing_checkout_response(payment: Payment) -> CheckoutResponse:
     try:
         stripe_session = retrieve_checkout_session(payment.provider_session_id)
     except Exception as exc:
-        logger.exception(
-            "Erro ao recuperar checkout Stripe: payment_id=%s",
+        logger.error(
+            "Falha na consulta Stripe: payment_id=%s erro=%s",
             payment.id,
+            type(exc).__name__,
         )
         raise HTTPException(
             status_code=502,
@@ -78,6 +81,83 @@ def _existing_checkout_response(payment: Payment) -> CheckoutResponse:
         ) from exc
 
     return _checkout_response(stripe_session, payment.order_id)
+
+
+def _continue_checkout(session: Session, payment: Payment) -> CheckoutResponse:
+    if payment.provider == "stripe":
+        return _existing_checkout_response(payment)
+
+    order_id = payment.order_id
+    payment = abacatepay.payment_for_update(session, order_id)
+    if not payment:
+        raise HTTPException(404, "Pagamento não encontrado")
+
+    if payment.status == PaymentStatus.PENDING.value:
+        checked = abacatepay.refresh_from_client(session, payment)
+        if (
+            not payment.provider_session_id
+            and payment.status == PaymentStatus.PENDING.value
+        ):
+            first_attempt = not payment.provider_creation_started
+            if not checked and not first_attempt:
+                raise HTTPException(
+                    503,
+                    "A emissão do checkout está em verificação. Acompanhe o pedido.",
+                )
+            card_product = None
+            if payment.provider_method == "CARD":
+                if not first_attempt:
+                    session.commit()
+                    raise HTTPException(
+                        503,
+                        "A emissão do checkout está em verificação. Acompanhe o pedido.",
+                    )
+                try:
+                    card_product = abacatepay.prepare_card_product(payment)
+                except HTTPException:
+                    payment.provider_checkout_details = None
+                    session.commit()
+                    raise
+
+            attempt_at = utc_now()
+            payment.provider_checked_at = attempt_at
+            payment.provider_checkout_details = None
+            if first_attempt:
+                payment.provider_creation_started = True
+                # Persist intent before I/O. Hosted checkout POST cannot safely be repeated.
+                session.commit()
+                payment = abacatepay.payment_for_update(session, order_id)
+                if not payment or (
+                    not payment.provider_checked_at
+                    or abacatepay.aware(payment.provider_checked_at) != attempt_at
+                ):
+                    raise abacatepay.unavailable()
+
+            try:
+                remote = abacatepay.create_remote(payment, card_product=card_product)
+                abacatepay.apply_remote(session, payment, remote)
+            except abacatepay.ChargeRejected:
+                if not first_attempt:
+                    session.commit()
+                    raise abacatepay.unavailable() from None
+                abacatepay.close_unpaid(session, payment, PaymentStatus.REJECTED.value)
+            except HTTPException:
+                session.commit()
+                raise
+        session.commit()
+
+    checkout_url = (payment.provider_checkout_details or {}).get("checkout_url")
+
+    return CheckoutResponse(
+        session_id=str(order_id), order_id=order_id, checkout_url=checkout_url
+    )
+
+
+@router.get("/methods")
+def payment_methods() -> list[str]:
+    if settings.PAYMENT_PROVIDER == "stripe":
+        return ["CARD"]
+    return ["PIX", "CARD"] if settings.ABACATEPAY_CARD_ENABLED else ["PIX"]
 
 
 def _resolve_product(item, session: Session) -> Product | None:
@@ -88,25 +168,50 @@ def _resolve_product(item, session: Session) -> Product | None:
 def create_checkout(
     payload: CreateCheckoutRequest, session: _SessionDep, user: CurrentUser
 ):
-    """Cria uma sessão de checkout Stripe com reserva atômica de estoque."""
+    """Reserva estoque e emite a cobrança com o total calculado no servidor."""
+    legacy = settings.PAYMENT_PROVIDER == "stripe"
 
-    if not settings.STRIPE_SECRET_KEY.strip():
-        raise HTTPException(
-            status_code=500,
-            detail="Stripe nao configurada. Defina STRIPE_SECRET_KEY no backend.",
-        )
-
+    # Serialize same-account attempts before reading idempotency and pending state.
+    session.exec(
+        select(UserInDB.id).where(UserInDB.id == user.id).with_for_update()
+    ).one()
     existing_payment = session.exec(
         select(Payment).where(Payment.idempotency_key == payload.idempotency_key)
     ).first()
     if existing_payment:
         if existing_payment.user_id != user.id:
-            raise HTTPException(
-                status_code=409, detail="Chave de checkout já utilizada"
-            )
-        return _existing_checkout_response(existing_payment)
+            raise HTTPException(409, "Chave de checkout já utilizada")
+        return _continue_checkout(session, existing_payment)
 
-    total_amount = Decimal("0")
+    if legacy:
+        if not settings.STRIPE_SECRET_KEY.strip():
+            raise HTTPException(503, "Pagamento temporariamente indisponível.")
+    else:
+        if not settings.ABACATEPAY_API_KEY.strip():
+            raise HTTPException(503, "Pagamento temporariamente indisponível.")
+        if (
+            settings.ABACATEPAY_DEV_MODE
+            and shipping_service.environment() == "production"
+        ):
+            raise HTTPException(
+                503, "Pagamento de teste exige frete em ambiente de teste."
+            )
+        if payload.method not in payment_methods():
+            raise HTTPException(422, "Forma de pagamento indisponível.")
+        pending = session.exec(
+            select(Payment.id).where(
+                Payment.user_id == user.id,
+                Payment.provider == abacatepay.PROVIDER,
+                Payment.status == PaymentStatus.PENDING.value,
+            )
+        ).first()
+        if pending:
+            raise HTTPException(
+                409,
+                "Já existe um pagamento pendente. Acompanhe o pedido antes de tentar novamente.",
+            )
+
+    total_amount = Decimal(0)
     order_id = uuid4()
     verified_items = []
 
@@ -134,7 +239,8 @@ def create_checkout(
             total_amount += Decimal(str(shipping_option["price"]))
 
             # Valida produtos e reserva estoque (SELECT FOR UPDATE evita overselling)
-            for item in sorted(payload.items, key=lambda item: item.id or ""):
+            resolved = []
+            for item in payload.items:
                 product = _resolve_product(item, session)
                 if not product or not product.active:
                     raise HTTPException(
@@ -144,6 +250,9 @@ def create_checkout(
                 if product.price <= 0:
                     raise HTTPException(409, "Produto indisponível para compra")
 
+                resolved.append((product, item))
+
+            for product, item in sorted(resolved, key=lambda pair: str(pair[0].id)):
                 stock = session.exec(
                     select(Stock)
                     .where(Stock.product_id == product.id)
@@ -169,7 +278,7 @@ def create_checkout(
                     quantity_to_remove=item.quantity,
                     session=session,
                     order_id=order_id,
-                    reason="Reserva de estoque para checkout Stripe",
+                    reason="Reserva de estoque para checkout",
                 )
                 verified_items.append(
                     {
@@ -181,22 +290,25 @@ def create_checkout(
                     }
                 )
 
-            # Cria sessão no Stripe (fora do banco, mas ainda dentro do try)
-            stripe_session = create_checkout_session(
-                verified_items,
-                order_id,
-                payer_email=user.email,
-                idempotency_key=str(payload.idempotency_key),
-                shipping_amount=Decimal(str(shipping_option["price"])),
-                shipping_name=f"{shipping_option['company']} - {shipping_option['name']}",
+            stripe_session = None
+            stripe_session_id = None
+            total_amount = total_amount.quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
             )
-            checkout_url = _stripe_value(stripe_session, "url")
-            stripe_session_id = _stripe_value(stripe_session, "id")
-            if not checkout_url or not stripe_session_id:
-                raise HTTPException(
-                    status_code=502,
-                    detail="Stripe não retornou uma sessão de checkout válida",
+            if not legacy and abacatepay.cents(total_amount) < 100:
+                raise HTTPException(422, "O total mínimo para pagamento é R$ 1,00.")
+            if legacy:
+                stripe_session = create_checkout_session(
+                    verified_items,
+                    order_id,
+                    payer_email=user.email,
+                    idempotency_key=str(payload.idempotency_key),
+                    shipping_amount=Decimal(str(shipping_option["price"])),
+                    shipping_name=f"{shipping_option['company']} - {shipping_option['name']}",
                 )
+                stripe_session_id = _checkout_response(
+                    stripe_session, order_id
+                ).session_id
 
             payment = Payment(
                 order_id=order_id,
@@ -206,6 +318,9 @@ def create_checkout(
                 payer_email=user.email,
                 amount=total_amount,
                 provider_session_id=stripe_session_id,
+                provider=settings.PAYMENT_PROVIDER,
+                provider_method=None if legacy else payload.method,
+                provider_dev_mode=None if legacy else settings.ABACATEPAY_DEV_MODE,
                 status=PaymentStatus.PENDING.value,
             )
             session.add(payment)
@@ -241,33 +356,87 @@ def create_checkout(
             select(Payment).where(Payment.idempotency_key == payload.idempotency_key)
         ).first()
         if existing_payment and existing_payment.user_id == user.id:
-            return _existing_checkout_response(existing_payment)
+            return _continue_checkout(session, existing_payment)
         raise HTTPException(status_code=409, detail="Checkout duplicado")
     except Exception as exc:
         session.rollback()
-        logger.exception("Erro ao criar checkout: order_id=%s", order_id)
+        logger.error(
+            "Falha no checkout: order_id=%s erro=%s", order_id, type(exc).__name__
+        )
         raise HTTPException(status_code=500, detail="Erro ao criar checkout") from exc
 
-    return _checkout_response(stripe_session, order_id)
+    if legacy:
+        return _checkout_response(stripe_session, order_id)
+    return _continue_checkout(session, payment)
 
 
-@router.get("/checkout/{session_id}", response_model=CheckoutStatusResponse)
-def get_checkout_status(session_id: str, session: _SessionDep, user: CurrentUser):
+@router.get("/checkout/active")
+def active_checkout(session: _SessionDep, user: CurrentUser) -> CheckoutResponse:
     payment = session.exec(
         select(Payment).where(
-            Payment.provider_session_id == session_id,
+            Payment.provider == abacatepay.PROVIDER,
             Payment.user_id == user.id,
+            Payment.status == PaymentStatus.PENDING.value,
         )
     ).first()
     if not payment:
-        raise HTTPException(status_code=404, detail="Pagamento não encontrado")
+        raise HTTPException(404, "Nenhum pagamento pendente.")
+    return CheckoutResponse(session_id=str(payment.order_id), order_id=payment.order_id)
+
+
+@router.post("/checkout/{order_id}/resume", response_model=CheckoutResponse)
+def resume_checkout(order_id: UUID, session: _SessionDep, user: CurrentUser):
+    payment = abacatepay.payment_for_update(session, order_id, user_id=user.id)
+    if not payment:
+        raise HTTPException(404, "Pagamento não encontrado")
+    return _continue_checkout(session, payment)
+
+
+@router.get("/checkout/{session_id}", response_model=CheckoutStatusResponse)
+def get_checkout_status(
+    session_id: str, response: Response, session: _SessionDep, user: CurrentUser
+) -> CheckoutStatusResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        order_id = UUID(session_id)
+    except ValueError:
+        order_id = None
+
+    if order_id:
+        payment = session.exec(
+            select(Payment)
+            .where(
+                Payment.provider == abacatepay.PROVIDER,
+                Payment.order_id == order_id,
+                Payment.user_id == user.id,
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).first()
+    else:
+        payment = session.exec(
+            select(Payment).where(
+                Payment.provider == "stripe",
+                Payment.provider_session_id == session_id,
+                Payment.user_id == user.id,
+            )
+        ).first()
+    if not payment:
+        raise HTTPException(404, "Pagamento não encontrado")
+
+    details = {}
+    if order_id and payment.status in abacatepay.ACTIVE_STATUSES:
+        abacatepay.refresh_from_client(session, payment)
+        session.commit()
+        details = payment.provider_checkout_details or {}
 
     return CheckoutStatusResponse(
         session_id=session_id,
         order_id=payment.order_id,
-        status=str(payment.status),
+        status=payment.status,
         amount=float(payment.amount),
         currency=payment.currency,
+        **details,
     )
 
 
@@ -276,6 +445,7 @@ def cancel_checkout(order_id: UUID, session: _SessionDep, user: CurrentUser):
     payment = session.exec(
         select(Payment)
         .where(
+            Payment.provider == "stripe",
             Payment.order_id == order_id,
             Payment.user_id == user.id,
         )
@@ -288,15 +458,16 @@ def cancel_checkout(order_id: UUID, session: _SessionDep, user: CurrentUser):
         try:
             expire_checkout_session(payment.provider_session_id)
         except Exception as exc:
-            logger.exception(
-                "Erro ao expirar checkout Stripe: payment_id=%s",
+            logger.error(
+                "Falha ao expirar checkout Stripe: payment_id=%s erro=%s",
                 payment.id,
+                type(exc).__name__,
             )
             # A previous successful expiration may have lost its response.
             # Release only after the provider confirms expiration, never on a timeout.
             try:
                 remote = retrieve_checkout_session(payment.provider_session_id)
-            except Exception:
+            except Exception:  # noqa: BLE001 - keep the reservation if the provider cannot confirm
                 remote = None
             if not remote or _stripe_value(remote, "status") != "expired":
                 raise HTTPException(
@@ -318,9 +489,10 @@ def cancel_checkout(order_id: UUID, session: _SessionDep, user: CurrentUser):
             session.refresh(payment)
         except Exception as exc:
             session.rollback()
-            logger.exception(
-                "Erro ao liberar estoque do checkout: payment_id=%s",
+            logger.error(
+                "Falha ao liberar estoque: payment_id=%s erro=%s",
                 payment.id,
+                type(exc).__name__,
             )
             raise HTTPException(
                 status_code=500,

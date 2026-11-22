@@ -36,6 +36,11 @@ def fail(session, shipment, error):
     persist(session, shipment, "needs_review")
 
 
+def enforce_payment_environment(payment):
+    if payment.provider == "abacatepay" and payment.provider_dev_mode is not False and me.environment() == "production":
+        raise HTTPException(409, "Pagamento de teste não libera envio de produção")
+
+
 def prepare(session, shipment, payment, invoice_key):
     if shipment.status != "pending":
         raise HTTPException(
@@ -43,6 +48,7 @@ def prepare(session, shipment, payment, invoice_key):
         )
     if str(payment.status) != "approved":
         raise HTTPException(409, "Aguarde a confirmação do pagamento do pedido")
+    enforce_payment_environment(payment)
     quote = session.get(ShippingQuote, shipment.quote_id)
     if quote.environment != me.environment():
         raise HTTPException(409, "Este envio pertence a outro ambiente Melhor Envio")
@@ -232,6 +238,7 @@ def refresh(session, shipment):
 def pay(session, shipment, payment):
     if str(payment.status) != "approved":
         raise HTTPException(409, "Pedido ainda não está pago")
+    enforce_payment_environment(payment)
     if shipment.status != "carted":
         raise HTTPException(
             409, "Atualize o status: a etiqueta deve estar no carrinho para ser paga"

@@ -48,6 +48,9 @@ STATUS_LABELS = {
     PaymentStatus.REJECTED.value: "Recusado",
     PaymentStatus.CANCELLED.value: "Cancelado",
     PaymentStatus.REFUNDED.value: "Reembolsado",
+    PaymentStatus.EXPIRED.value: "Expirado",
+    PaymentStatus.DISPUTED.value: "Em disputa",
+    PaymentStatus.REFUND_PENDING.value: "Reembolso em análise",
 }
 
 

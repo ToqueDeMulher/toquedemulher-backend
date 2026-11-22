@@ -1,6 +1,6 @@
 # Integrações — 09/11/2026
 
-O ambiente solicitado é de **teste**: Stripe test e Melhor Envio sandbox.
+O ambiente solicitado é de **teste**: AbacatePay Dev Mode e Melhor Envio sandbox.
 O nome `Production` abaixo é o ambiente de publicação da Vercel; não significa
 que pagamentos ou etiquetas reais estejam liberados.
 
@@ -25,7 +25,7 @@ precisa ser homologada.
 
 ## Pendências confirmadas pela loja
 
-A loja ainda não possui as credenciais Stripe e Melhor Envio, nem os dados reais
+A loja ainda não possui as credenciais de pagamento e Melhor Envio, nem os dados reais
 de estoque e embalagem. Pagamentos, frete e cadastro permanecem pendentes.
 Os saldos existentes foram preservados e continuam zerados nos quatro produtos
 ativos. Nenhum produto foi liberado para venda nesta correção.
@@ -38,13 +38,10 @@ importado automaticamente. Não foram inventadas categorias, medidas ou saldos.
 
 ## Quando as credenciais estiverem disponíveis
 
-1. No Stripe, usar o modo de teste e salvar `STRIPE_SECRET_KEY` de teste como
-   segredo no backend da Vercel. Nunca usar uma chave `sk_live_` nesta homologação.
-2. Criar um webhook de teste para
-   `https://toquedemulher-backend.vercel.app/api/v1/payments/webhook`, com os eventos
-   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-   `checkout.session.async_payment_failed`, `checkout.session.expired` e
-   `charge.refunded`. Salvar o segredo desse endpoint em `STRIPE_WEBHOOK_SECRET`.
+1. Gerar a chave de Dev Mode e configurar o Pix e o cartão conforme o
+   [guia da AbacatePay](abacatepay.md).
+2. Registrar o webhook de teste e verificar a autenticação e a reentrega
+   no ambiente isolado.
 3. Criar o aplicativo no Melhor Envio sandbox e cadastrar exatamente a URL de
    callback da tabela acima. Salvar `MELHOR_ENVIO_CLIENT_ID` e
    `MELHOR_ENVIO_CLIENT_SECRET` como segredos no backend da Vercel.

@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
+    abacatepay_webhook,
     addressRouter,
     shipping,
     brasilApi,
@@ -8,7 +9,7 @@ from app.api.v1.endpoints import (
     paymentMethodRouter,
     product,
     stock,
-    stripeCheckout,
+    payments,
     supplier,
     supplierProduct,
     user,
@@ -21,9 +22,10 @@ api_router = APIRouter(prefix=settings.API_V1_PREFIX)
 
 api_router.include_router(admin.router)
 api_router.include_router(product.router)
-api_router.include_router(stripeCheckout.router)
+api_router.include_router(payments.router)
 api_router.include_router(user.router)
 api_router.include_router(weebhook.router)
+api_router.include_router(abacatepay_webhook.router)
 api_router.include_router(login.router)
 api_router.include_router(addressRouter.router)
 api_router.include_router(paymentMethodRouter.router)

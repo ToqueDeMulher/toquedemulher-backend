@@ -42,4 +42,4 @@ EXPOSE 8000
 
 # Uvicorn em modo produção: sem reload, 2 workers por padrão.
 # Para escalar, passe WEB_CONCURRENCY como variável de ambiente.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

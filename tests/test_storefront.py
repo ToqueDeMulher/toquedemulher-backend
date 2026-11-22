@@ -128,8 +128,8 @@ def test_cancel_confirmed_expired_session_releases_stock_once(monkeypatch):
     order = client.post("/api/v1/payments/checkout", json=payload, headers=headers).json()["order_id"]
     def already_expired(session_id):
         raise RuntimeError("Response lost")
-    monkeypatch.setattr("app.api.v1.endpoints.stripeCheckout.expire_checkout_session", already_expired)
-    monkeypatch.setattr("app.api.v1.endpoints.stripeCheckout.retrieve_checkout_session", lambda session_id: {"status": "expired"})
+    monkeypatch.setattr("app.api.v1.endpoints.payments.expire_checkout_session", already_expired)
+    monkeypatch.setattr("app.api.v1.endpoints.payments.retrieve_checkout_session", lambda session_id: {"status": "expired"})
     url = f"/api/v1/payments/checkout/{order}/cancel"
     assert client.post(url, headers=headers).json()["status"] == "cancelled"
     assert client.post(url, headers=headers).json()["status"] == "cancelled"
@@ -143,8 +143,8 @@ def test_failed_cancellation_never_releases_stock(monkeypatch):
     quote = make_quote(monkeypatch, product_id)
     payload, headers, _ = checkout(monkeypatch, product_id, quote)
     order = client.post("/api/v1/payments/checkout", json=payload, headers=headers).json()["order_id"]
-    monkeypatch.setattr("app.api.v1.endpoints.stripeCheckout.expire_checkout_session", lambda *a: (_ for _ in ()).throw(RuntimeError("timeout")))
-    monkeypatch.setattr("app.api.v1.endpoints.stripeCheckout.retrieve_checkout_session", lambda *a: {"status": "complete"})
+    monkeypatch.setattr("app.api.v1.endpoints.payments.expire_checkout_session", lambda *a: (_ for _ in ()).throw(RuntimeError("timeout")))
+    monkeypatch.setattr("app.api.v1.endpoints.payments.retrieve_checkout_session", lambda *a: {"status": "complete"})
     assert client.post(f"/api/v1/payments/checkout/{order}/cancel", headers=headers).status_code == 502
     with Session(engine) as session:
         assert session.exec(select(Stock)).one().total_quantity == 19
@@ -174,6 +174,7 @@ def test_completed_pending_then_approved_repeated_webhooks_keep_stock_reserved(m
     result = client.post("/api/v1/payments/checkout", json=payload, headers=headers).json()
     event = {"type": "checkout.session.completed", "data": {"object": {
         "id": result["session_id"], "payment_status": "unpaid", "payment_intent": "pi_test",
+        "amount_total": 6850, "currency": "brl",
         "metadata": {"order_id": result["order_id"]},
     }}}
     monkeypatch.setattr("stripe.Webhook.construct_event", lambda **kwargs: event)
