@@ -22,6 +22,7 @@ class CreateCheckoutRequest(BaseModel):
     items: list[CheckoutItem] = Field(min_length=1, max_length=100)
     method: Literal["PIX", "CARD"] = "PIX"
     shipping: ShippingSelection | None = None
+    coupon_code: str | None = Field(default=None, min_length=1, max_length=50)
 
 
 class PixDetails(BaseModel):
@@ -42,6 +43,7 @@ class CheckoutStatusResponse(BaseModel):
     order_id: UUID
     status: str
     amount: float
+    discount_amount: float = 0
     currency: str
     pix: PixDetails | None = None
     checkout_url: str | None = None

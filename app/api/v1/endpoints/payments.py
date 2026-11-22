@@ -23,7 +23,7 @@ from app.schemas.create_checkout import (
     CheckoutStatusResponse,
     CreateCheckoutRequest,
 )
-from app.services import abacatepay
+from app.services import abacatepay, coupon_service
 from app.services import melhor_envio as shipping_service
 from app.services.checkoutService import (
     create_checkout_session,
@@ -268,6 +268,18 @@ def create_checkout(
                     detail="Endereço não encontrado ou não pertence ao usuário",
                 )
 
+            coupon = None
+            if payload.coupon_code:
+                if legacy:
+                    raise HTTPException(
+                        422, "Cupons indisponíveis nesta forma de pagamento."
+                    )
+                # Trava o cupom até o commit: compras simultâneas não
+                # ultrapassam o limite de usos.
+                coupon = coupon_service.find_usable(
+                    session, payload.coupon_code, user.id, lock=True
+                )
+
             quote, shipping_option = shipping_service.validate_selection(
                 payload.shipping, payload.items, address, session
             )
@@ -325,6 +337,19 @@ def create_checkout(
                     }
                 )
 
+            discount_amount = Decimal("0.00")
+            if coupon:
+                items_subtotal = sum(
+                    (item["unit_price"] * item["quantity"] for item in verified_items),
+                    Decimal("0.00"),
+                )
+                discount_amount = coupon_service.discount_for(
+                    coupon,
+                    items_subtotal,
+                    limit=total_amount - coupon_service.MINIMUM_TOTAL,
+                )
+                total_amount -= discount_amount
+
             stripe_session = None
             stripe_session_id = None
             total_amount = total_amount.quantize(
@@ -352,6 +377,8 @@ def create_checkout(
                 address_id=payload.address_id,
                 payer_email=user.email,
                 amount=total_amount,
+                coupon_id=coupon.id if coupon else None,
+                discount_amount=discount_amount,
                 provider_session_id=stripe_session_id,
                 provider=settings.PAYMENT_PROVIDER,
                 provider_method=None if legacy else payload.method,
@@ -470,6 +497,7 @@ def get_checkout_status(
         order_id=payment.order_id,
         status=payment.status,
         amount=float(payment.amount),
+        discount_amount=float(payment.discount_amount or 0),
         currency=payment.currency,
         **details,
     )
@@ -539,5 +567,6 @@ def cancel_checkout(order_id: UUID, session: _SessionDep, user: CurrentUser):
         order_id=payment.order_id,
         status=str(payment.status),
         amount=float(payment.amount),
+        discount_amount=float(payment.discount_amount or 0),
         currency=payment.currency,
     )
