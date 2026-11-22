@@ -15,6 +15,7 @@ from app.api.v1.endpoints import (
     user,
     weebhook,
     contact,
+    coupons,
 )
 from app.core.settings import settings
 
@@ -36,3 +37,4 @@ api_router.include_router(supplierProduct.router)
 api_router.include_router(shipping.router)
 api_router.include_router(brasilApi.router)
 api_router.include_router(contact.router)
+api_router.include_router(coupons.router)
