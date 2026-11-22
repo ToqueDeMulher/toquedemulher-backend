@@ -76,8 +76,17 @@ def _request(
             timeout=httpx.Timeout(6, connect=2),
             follow_redirects=False,
         )
-        if allow_missing and response.status_code == 404:
-            return None
+        if allow_missing and method == "GET":
+            if response.status_code == 404:
+                return None
+            missing_errors = {
+                "products/get": "Product not found",
+                "checkouts/get": "Billing not found",
+            }
+            if response.status_code == 400 and path in missing_errors:
+                missing = response.json()
+                if isinstance(missing, dict) and missing.get("error") == missing_errors[path]:
+                    return None
         if charge_creation and response.status_code == 422:
             raise ChargeRejected
         response.raise_for_status()

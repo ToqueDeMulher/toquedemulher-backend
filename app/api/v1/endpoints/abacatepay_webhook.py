@@ -87,9 +87,17 @@ async def abacatepay_webhook(request: Request, session: _SessionDep) -> dict[str
     if not secret.strip():
         raise HTTPException(503, "Webhook indisponível")
 
-    supplied = request.query_params.getlist("webhookSecret")
-    if len(supplied) != 1 or not hmac.compare_digest(
-        supplied[0].encode(), secret.encode()
+    query_secrets = request.query_params.getlist("webhookSecret")
+    header_secrets = request.headers.getlist("x-webhook-secret")
+    supplied = query_secrets + header_secrets
+    if (
+        not supplied
+        or len(query_secrets) > 1
+        or len(header_secrets) > 1
+        or any(
+            not hmac.compare_digest(value.encode(), secret.encode())
+            for value in supplied
+        )
     ):
         raise HTTPException(403, "Webhook inválido")
 
