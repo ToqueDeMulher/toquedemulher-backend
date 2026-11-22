@@ -9,9 +9,10 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 
 from app.api.v1.router import api_router
-from app.core.db import Database
+from app.core.db import Database, _SessionDep
 from app.core.settings import settings
 
 
@@ -64,6 +65,12 @@ if STATIC_DIR.is_dir():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/ready")
+def readiness_check(session: _SessionDep):
+    session.exec(text("SELECT 1")).one()
+    return {"status": "ready"}
 
 
 app.include_router(api_router)
