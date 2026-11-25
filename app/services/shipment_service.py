@@ -67,12 +67,7 @@ def prepare(session, shipment, payment, invoice_key):
         service for service in quote.services if service["id"] == shipment.service_id
     )
     packages = service["packages"]
-    single_volume = shipment.company_name.lower() in {
-        "correios",
-        "j&t",
-        "j&t express",
-        "loggi",
-    }
+    single_volume = me.one_label_per_package(service, shipment.company_name)
     groups = [[package] for package in packages] if single_volume else [packages]
     calls = []
     declared_quantities = {}
@@ -219,7 +214,7 @@ def refresh(session, shipment):
     )
     expected = (
         len(service["packages"])
-        if shipment.company_name.lower() in {"correios", "j&t", "j&t express", "loggi"}
+        if me.one_label_per_package(service, shipment.company_name)
         else 1
     )
     if len(ids) != expected:
