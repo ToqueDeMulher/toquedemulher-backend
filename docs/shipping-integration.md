@@ -135,9 +135,9 @@ verifica a tag do pedido, o serviço e o CEP antes de aceitar os IDs.
   Use a conexão SQL do backend com privilégios próprios para essas tabelas.
 - Cotações públicas validam entradas e resolvem preços no banco. IDs não permitem
   consultar pedidos de outros usuários. Somente administradores operam etiquetas.
-- Os limites de consulta usam o IP do cliente. Atrás de proxy reverso ou load
-  balancer, configure `FORWARDED_ALLOW_IPS` (variável lida pelo Uvicorn) com o IP
-  ou a faixa do proxy; sem isso, todos os clientes compartilham o mesmo limite.
+- Os limites de consulta usam o IP do cliente resolvido pelo servidor ASGI, nunca
+  cabeçalhos lidos pela aplicação. Configuração para Docker, Vercel e proxies em
+  [IP do cliente e limite de consultas](client-ip-rate-limit.md).
 - BrasilAPI é usada apenas sob demanda, sem varredura de dados. O backend mantém
   cache de CEPs por 24 horas, com no máximo 512 entradas, timeout de cinco segundos
   e limite de 30 consultas por minuto por cliente/categoria. Esse limite é local
