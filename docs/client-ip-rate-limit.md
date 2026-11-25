@@ -59,7 +59,17 @@ repassam o IP do visitante, mas também que a borda sobrescreve
 `X-Forwarded-For` personalizado no plano Enterprise (Trusted Proxy). Por isso o
 IP visto pelo backend nesse caminho precisa ser confirmado por teste.
 
-**Resultado da verificação:** _pendente_ (ver abaixo).
+**Resultado da verificação (25/11/2026):** o proxy **preserva** o IP do cliente.
+Do mesmo navegador e rede, o acesso direto ao backend e o acesso pelo domínio do
+frontend produziram o mesmo resumo de `request.client.host`, igual ao de
+`X-Forwarded-For`, `X-Real-IP` e `X-Vercel-Forwarded-For` (uma entrada cada),
+com a mesma geolocalização. O caminho pelo proxy só acrescenta um salto
+(`x-vercel-id` com uma região a mais) e muda `x-forwarded-host` para o domínio
+do frontend. Portanto clientes diferentes **não** compartilham o limite por
+passarem pelo `vercel.json`, e nenhuma mudança no frontend é necessária.
+
+Esse comportamento entre projetos da Vercel não está descrito na documentação
+dela. Repita a verificação se mudar a hospedagem, o domínio ou a forma do proxy.
 
 ### Como verificar sem registrar IPs
 
