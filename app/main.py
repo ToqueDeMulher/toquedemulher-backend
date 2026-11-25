@@ -74,3 +74,46 @@ def readiness_check(session: _SessionDep):
 
 
 app.include_router(api_router)
+
+
+# --- TEMPORARY DIAGNOSTIC (branch diag/client-ip only, never merge) ---------
+# Shows how the caller's IP reaches the app without exposing or logging it:
+# every address is replaced by a keyed fingerprint (HMAC with SECRET_KEY).
+import hmac as _hmac
+import hashlib as _hashlib
+from fastapi import Request as _Request
+from fastapi.responses import JSONResponse as _JSONResponse
+
+
+def _fp(value):
+    if not value:
+        return None
+    return _hmac.new(
+        settings.SECRET_KEY.encode(), value.strip().encode(), _hashlib.sha256
+    ).hexdigest()[:10]
+
+
+@app.get("/api/v1/_diag/client-ip", include_in_schema=False)
+def _client_ip_diagnostic(request: _Request):
+    def header(name):
+        raw = request.headers.get(name)
+        entries = [item for item in (raw or "").split(",") if item.strip()]
+        return {"present": raw is not None, "entries": len(entries),
+                "fingerprints": [_fp(item) for item in entries]}
+
+    vercel_id = request.headers.get("x-vercel-id", "")
+    body = {
+        "rate_limit_key_fingerprint": _fp(request.client.host if request.client else None),
+        "x-forwarded-for": header("x-forwarded-for"),
+        "x-real-ip": header("x-real-ip"),
+        "x-vercel-forwarded-for": header("x-vercel-forwarded-for"),
+        "forwarded": header("forwarded"),
+        "host": request.headers.get("host"),
+        "x-forwarded-host": request.headers.get("x-forwarded-host"),
+        "country": request.headers.get("x-vercel-ip-country"),
+        "region": request.headers.get("x-vercel-ip-country-region"),
+        # Only the region hops (e.g. "gru1::iad1"), not the request id.
+        "vercel_hops": "::".join(vercel_id.split("::")[:-1]) or None,
+        "has_x_vercel_proxy_signature": "x-vercel-proxy-signature" in request.headers,
+    }
+    return _JSONResponse(body, headers={"Cache-Control": "no-store"})
