@@ -36,7 +36,7 @@ Referências oficiais:
    MELHOR_ENVIO_USER_AGENT=
    MELHOR_ENVIO_SENDER={}
    MELHOR_ENVIO_SERVICES=1,2,3,4
-   MELHOR_ENVIO_FREE_SHIPPING_THRESHOLD=150
+   MELHOR_ENVIO_FREE_SHIPPING_THRESHOLD=0
    FRONTEND_URL=http://localhost:5173
    ```
 
@@ -71,16 +71,21 @@ Referências oficiais:
 2. A cotação utiliza `custom_price` e `custom_delivery_range`, excluindo serviços
    indisponíveis. O preço e prazo continuam vinculados à cotação no backend.
 3. A opção mais econômica recebe frete grátis acima do limite configurado;
-   serviços expressos continuam mostrando o próprio preço. `0` desativa o benefício.
-4. O checkout consulta o CEP pela BrasilAPI v2 ao sair do campo completo e permite
+   serviços expressos continuam mostrando o próprio preço. `0` desativa o benefício
+   e é o padrão: o frete grátis só existe quando a loja configura o valor.
+4. CEP com formato inválido é recusado antes de consultar o provedor. Quando o
+   Melhor Envio não devolve nenhum serviço, o backend consulta a BrasilAPI só para
+   escolher a mensagem: "CEP não encontrado" (404 definitivo) ou "Nenhuma
+   transportadora disponível". Falha da BrasilAPI nunca bloqueia uma cotação válida.
+5. O checkout consulta o CEP pela BrasilAPI v2 ao sair do campo completo e permite
    preenchimento manual. No cadastro de endereços, a mesma API substitui o ViaCEP.
-5. Na etapa de pagamento, confirme a entrega, nome, e-mail, telefone completo e CPF
+6. Na etapa de pagamento, confirme a entrega, nome, e-mail, telefone completo e CPF
    do destinatário. CPF é validado no backend; esses dados ficam no snapshot do envio.
-6. A AbacatePay recebe o total em centavos, calculado com os preços do catálogo e o
+7. A AbacatePay recebe o total em centavos, calculado com os preços do catálogo e o
    frete escolhido. Endereço alterado, cotação
    expirada, serviço fora da cotação ou mudança nos produtos exige nova cotação.
    Alterações em itens, quantidade ou preço invalidam a seleção no navegador.
-7. O perfil apresenta serviço, prazo após postagem, status e códigos de rastreio.
+8. O perfil apresenta serviço, prazo após postagem, status e códigos de rastreio.
    O cliente só pode consultar seus próprios pedidos.
 
 O antigo cupom aplicado apenas no navegador foi removido do carrinho porque o
@@ -104,8 +109,13 @@ como fallback quando o provedor está indisponível.
 6. Consulte o status para acompanhar postagem e entrega. Foi implementada busca
    ativa; não é necessário configurar um webhook Melhor Envio nesta versão.
 
-Correios, J&T e Loggi recebem uma chamada ao carrinho por pacote; transportadoras
-que aceitam múltiplos volumes recebem todos em uma chamada. Serviços padrão são
+A divisão das etiquetas segue o campo `has_grouped_volumes` do catálogo
+`GET /api/v2/me/shipment/services`, consultado com cache de seis horas e gravado
+em cada serviço da cotação (`grouped_volumes`). Transportadoras sem volumes
+agrupados (Correios, JeT, Loggi, Total Express) recebem uma chamada ao carrinho
+por pacote; as demais recebem todos os volumes em uma chamada. Se o catálogo
+estiver indisponível, a cotação continua e o envio usa uma etiqueta por pacote,
+formato aceito por todas. Cotações antigas, sem o campo, usam a lista de nomes. Serviços padrão são
 Correios e Jadlog (`1,2,3,4`); confira exigências de agência/XML antes de habilitar
 outros serviços no ambiente real. Esta implementação exige NF-e para a loja e
 não implementa envios não comerciais/DC-e, logística reversa ou recarga da carteira.
@@ -125,6 +135,9 @@ verifica a tag do pedido, o serviço e o CEP antes de aceitar os IDs.
   Use a conexão SQL do backend com privilégios próprios para essas tabelas.
 - Cotações públicas validam entradas e resolvem preços no banco. IDs não permitem
   consultar pedidos de outros usuários. Somente administradores operam etiquetas.
+- Os limites de consulta usam o IP do cliente resolvido pelo servidor ASGI, nunca
+  cabeçalhos lidos pela aplicação. Configuração para Docker, Vercel e proxies em
+  [IP do cliente e limite de consultas](client-ip-rate-limit.md).
 - BrasilAPI é usada apenas sob demanda, sem varredura de dados. O backend mantém
   cache de CEPs por 24 horas, com no máximo 512 entradas, timeout de cinco segundos
   e limite de 30 consultas por minuto por cliente/categoria. Esse limite é local

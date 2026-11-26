@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     MELHOR_ENVIO_SERVICES: str = "1,2,3,4"
     MELHOR_ENVIO_TIMEOUT: float = 10.0
     MELHOR_ENVIO_QUOTE_TTL_MINUTES: int = 15
-    MELHOR_ENVIO_FREE_SHIPPING_THRESHOLD: float = 150.0
+    MELHOR_ENVIO_FREE_SHIPPING_THRESHOLD: float = 0.0
 
     # Upload
     UPLOAD_DIR: str = "uploads"

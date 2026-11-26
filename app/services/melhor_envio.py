@@ -5,6 +5,8 @@ import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from threading import Lock
+from time import monotonic
 from uuid import UUID
 from urllib.parse import urlencode
 
@@ -17,6 +19,21 @@ from app.core.settings import settings
 from app.core.time import utc_now
 from app.models.product import Product
 from app.models.shipping import ShippingConnection, ShippingQuote, Shipment
+from app.services import brasil_api
+
+# Carriers that accept a single volume per label, used only for quotes saved
+# before the provider catalog flag was snapshotted. Names match the API.
+LEGACY_SINGLE_VOLUME_COMPANIES = {
+    "correios",
+    "j&t",
+    "j&t express",
+    "jet",
+    "loggi",
+    "total express",
+}
+CATALOG_TTL_SECONDS = 6 * 3600
+_catalog_lock = Lock()
+_catalog = {"environment": None, "expires": 0.0, "data": {}}
 
 SCOPES = "cart-read cart-write orders-read shipping-calculate shipping-checkout shipping-generate shipping-print shipping-tracking"
 
@@ -289,7 +306,62 @@ def resolved_items(items, session):
     return sorted(merged.values(), key=lambda item: item["id"])
 
 
-def normalize_services(data, subtotal):
+def _catalog_entries(data):
+    if isinstance(data, dict) and isinstance(data.get("data"), list):
+        data = data["data"]
+    if not isinstance(data, list):
+        return {}
+    catalog = {}
+    for item in data:
+        try:
+            catalog[int(item["id"])] = bool(int(item["company"]["has_grouped_volumes"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return catalog
+
+
+def service_catalog(session):
+    """Map service ID to the provider's ``has_grouped_volumes`` flag.
+
+    The catalog only decides how labels are split later; an unavailable
+    catalog must not block quotes, so failures return an empty mapping.
+    """
+    now = monotonic()
+    env = environment()
+    with _catalog_lock:
+        if _catalog["environment"] == env and _catalog["expires"] > now:
+            return dict(_catalog["data"])
+    try:
+        catalog = _catalog_entries(
+            request(session, "GET", "/api/v2/me/shipment/services")
+        )
+    except HTTPException:
+        return {}
+    if catalog:
+        with _catalog_lock:
+            _catalog.update(
+                environment=env, expires=now + CATALOG_TTL_SECONDS, data=catalog
+            )
+    return catalog
+
+
+def one_label_per_package(service, company_name):
+    """Carriers without grouped volumes need one cart entry per package."""
+    if "grouped_volumes" in service:
+        return not service["grouped_volumes"]
+    return company_name.lower() in LEGACY_SINGLE_VOLUME_COMPANIES
+
+
+def postal_code_exists(postal_code):
+    """Only a definitive "not found" counts as invalid; outages are unknown."""
+    try:
+        brasil_api.lookup_cep(postal_code)
+    except HTTPException as error:
+        return error.status_code != 404
+    return True
+
+
+def normalize_services(data, subtotal, catalog=None):
     if not isinstance(data, list):
         raise HTTPException(502, "Resposta de cotação inválida")
     services = []
@@ -316,11 +388,15 @@ def normalize_services(data, subtotal):
                     or float(package["weight"]) <= 0
                 ):
                     raise ValueError()
+            service_id = int(item["id"])
             services.append(
                 {
-                    "id": int(item["id"]),
+                    "id": service_id,
                     "name": item["name"],
                     "company": item["company"]["name"],
+                    # Unknown carriers default to one label per package,
+                    # which every carrier accepts.
+                    "grouped_volumes": bool((catalog or {}).get(service_id, False)),
                     "cost": float(cost.quantize(Decimal("0.01"))),
                     "price": float(cost.quantize(Decimal("0.01"))),
                     "delivery_min": delivery_min,
@@ -350,6 +426,7 @@ def create_quote(payload, session):
         (Decimal(str(item["unit_price"])) * item["quantity"] for item in items),
         Decimal("0"),
     )
+    catalog = service_catalog(session)
     data = request(
         session,
         "POST",
@@ -373,12 +450,20 @@ def create_quote(payload, session):
             "services": settings.MELHOR_ENVIO_SERVICES,
         },
     )
+    try:
+        services = normalize_services(data, subtotal, catalog)
+    except HTTPException as error:
+        if error.status_code == 422 and not postal_code_exists(payload.postal_code):
+            raise HTTPException(
+                422, "CEP não encontrado. Confira os dígitos e tente novamente."
+            )
+        raise
     quote = ShippingQuote(
         environment=environment(),
         origin_postal_code=origin,
         postal_code=payload.postal_code,
         items=items,
-        services=normalize_services(data, subtotal),
+        services=services,
         subtotal=subtotal,
         expires_at=utc_now()
         + timedelta(minutes=settings.MELHOR_ENVIO_QUOTE_TTL_MINUTES),
@@ -396,7 +481,11 @@ def create_quote(payload, session):
             for item in quote.items
         ],
         "services": [
-            {k: v for k, v in service.items() if k != "packages"}
+            {
+                k: v
+                for k, v in service.items()
+                if k not in ("packages", "grouped_volumes")
+            }
             for service in quote.services
         ],
     }

@@ -58,6 +58,12 @@ def config(monkeypatch):
     monkeypatch.setattr(settings, "EMAIL_CONFIRMATION_REQUIRED", False)
     brasil_api._requests.clear()
     brasil_api._cache.clear()
+    # Provider catalog: Correios is single-volume, Jadlog groups volumes.
+    monkeypatch.setattr(
+        me,
+        "service_catalog",
+        lambda session: {1: False, 2: False, 3: True, 4: True, 17: False},
+    )
 
 
 def setup_product(price=49.9):
@@ -529,6 +535,7 @@ def test_multiple_correios_packages_keep_each_product_declaration(monkeypatch):
         services = copy.deepcopy(quote.services)
         service = next(item for item in services if item["id"] == shipment.service_id)
         service["company"] = "Correios"
+        service["grouped_volumes"] = False
         service["packages"] = [
             copy.deepcopy(service["packages"][0]),
             copy.deepcopy(service["packages"][0]),
@@ -671,3 +678,308 @@ def test_incomplete_sender_still_blocks_checkout_before_stripe(monkeypatch):
     with Session(engine) as session:
         assert session.exec(select(Stock)).one().total_quantity == 20
         assert not session.exec(select(Payment)).all()
+
+
+# --- Quote hardening -------------------------------------------------------
+
+
+def quote_request(product_ids, postal_code="70000000"):
+    return client.post(
+        "/api/v1/shipping/quotes",
+        json={
+            "postal_code": postal_code,
+            "items": [
+                {"id": product_id, "name": "Produto", "quantity": quantity}
+                for product_id, quantity in product_ids
+            ],
+        },
+    )
+
+
+@pytest.mark.parametrize("postal_code", ["7000000", "700000000", "70000-00", "abcdefgh", ""])
+def test_malformed_postal_code_is_rejected_without_provider_call(
+    monkeypatch, postal_code
+):
+    product_id = setup_product()
+    monkeypatch.setattr(
+        me, "request", lambda *a, **k: pytest.fail("provider should not be called")
+    )
+    assert quote_request([(product_id, 1)], postal_code).status_code == 422
+
+
+def test_nonexistent_postal_code_gets_specific_message(monkeypatch):
+    product_id = setup_product()
+    unavailable = [
+        {"id": 1, "name": "PAC", "error": "Serviço indisponível no momento (-2).",
+         "company": {"id": 1, "name": "Correios"}},
+    ]
+    monkeypatch.setattr(me, "request", lambda *a, **k: unavailable)
+
+    def not_found(cep):
+        raise HTTPException(404, "CEP não encontrado")
+
+    monkeypatch.setattr(brasil_api, "lookup_cep", not_found)
+    response = quote_request([(product_id, 1)], "00000000")
+    assert response.status_code == 422
+    assert "CEP não encontrado" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("lookup", ["exists", "outage"])
+def test_unserved_postal_code_keeps_generic_message(monkeypatch, lookup):
+    product_id = setup_product()
+    monkeypatch.setattr(
+        me,
+        "request",
+        lambda *a, **k: [{"id": 1, "error": "Transportadora não atende este trecho."}],
+    )
+
+    def fake_lookup(cep):
+        if lookup == "outage":
+            raise HTTPException(503, "indisponível")
+        return {"cep": cep}
+
+    monkeypatch.setattr(brasil_api, "lookup_cep", fake_lookup)
+    response = quote_request([(product_id, 1)])
+    assert response.status_code == 422
+    assert "Nenhuma transportadora" in response.json()["detail"]
+    with Session(engine) as session:
+        assert not session.exec(select(ShippingQuote)).all()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [httpx.ConnectTimeout("timeout"), httpx.ReadTimeout("timeout"), httpx.ConnectError("down")],
+)
+def test_provider_timeout_or_outage_returns_502_without_fake_price(
+    monkeypatch, failure
+):
+    product_id = setup_product()
+    monkeypatch.setattr(me, "access_token", lambda session: "token")
+
+    class FailingClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def request(self, *args, **kwargs):
+            raise failure
+
+    monkeypatch.setattr(me.httpx, "Client", FailingClient)
+    response = quote_request([(product_id, 1)])
+    assert response.status_code == 502
+    assert "token" not in response.text
+    with Session(engine) as session:
+        assert not session.exec(select(ShippingQuote)).all()
+
+
+@pytest.mark.parametrize("status,expected", [(401, 503), (429, 503), (500, 502)])
+def test_provider_http_errors_are_mapped_without_leaking_body(
+    monkeypatch, status, expected
+):
+    product_id = setup_product()
+    monkeypatch.setattr(me, "access_token", lambda session: "secret-token")
+    secret_body = {"message": "secret-token internal detail"}
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(status, json=secret_body)
+    )
+    real_client = httpx.Client
+    monkeypatch.setattr(
+        me.httpx, "Client", lambda **kwargs: real_client(transport=transport, **kwargs)
+    )
+    response = quote_request([(product_id, 1)])
+    assert response.status_code == expected
+    assert "secret-token" not in response.text
+
+
+def test_multiple_products_are_merged_and_priced_from_database(monkeypatch):
+    first = setup_product(49.9)
+    with Session(engine) as session:
+        second = Product(
+            name="Base Real",
+            slug="base-real",
+            price=89.9,
+            shipping_width=10,
+            shipping_height=10,
+            shipping_length=15,
+            shipping_weight=0.4,
+        )
+        session.add(second)
+        session.commit()
+        second_id = str(second.id)
+    data, calls = fake_calculate(monkeypatch, first)
+    response = quote_request([(first, 1), (second_id, 2), (first, 2)])
+    assert response.status_code == 200, response.text
+    body = calls[0][2]["body"]
+    products = {item["id"]: item for item in body["products"]}
+    assert products[first]["quantity"] == 3
+    assert products[second_id]["quantity"] == 2
+    assert products[second_id]["weight"] == 0.4
+    assert products[second_id]["insurance_value"] == 89.9
+    assert response.json()["subtotal"] == pytest.approx(49.9 * 3 + 89.9 * 2)
+
+
+def test_unknown_or_inactive_product_cannot_be_quoted(monkeypatch):
+    monkeypatch.setattr(
+        me, "request", lambda *a, **k: pytest.fail("provider should not be called")
+    )
+    assert quote_request([(str(uuid4()), 1)]).status_code == 404
+    assert quote_request([("not-a-uuid", 1)]).status_code == 404
+
+
+def test_quote_response_hides_internal_fields(monkeypatch):
+    product_id = setup_product()
+    quote = make_quote(monkeypatch, product_id)
+    for service in quote["services"]:
+        assert "packages" not in service and "grouped_volumes" not in service
+    with Session(engine) as session:
+        stored = session.get(ShippingQuote, UUID(quote["id"]))
+        flags = {service["id"]: service["grouped_volumes"] for service in stored.services}
+    assert flags[1] is False and flags[3] is True
+
+
+def test_free_shipping_is_disabled_by_default():
+    from app.core.settings import Settings
+
+    assert Settings.model_fields["MELHOR_ENVIO_FREE_SHIPPING_THRESHOLD"].default == 0
+
+
+@pytest.mark.parametrize("tamper", ["foreign_quote", "price_in_payload", "service_of_other_quote"])
+def test_checkout_ignores_or_rejects_client_side_price_tampering(monkeypatch, tamper):
+    product_id = setup_product()
+    quote = make_quote(monkeypatch, product_id)
+    payload, headers, captured = checkout(monkeypatch, product_id, quote)
+    if tamper == "foreign_quote":
+        payload["shipping"]["quote_id"] = str(uuid4())
+    if tamper == "price_in_payload":
+        payload["items"][0]["unit_price"] = 0.01
+        payload["shipping"]["price"] = 0
+    if tamper == "service_of_other_quote":
+        # A real provider service that this particular quote did not offer.
+        with Session(engine) as session:
+            stored = session.get(ShippingQuote, UUID(quote["id"]))
+            stored.services = [s for s in stored.services if s["id"] != 2]
+            session.add(stored)
+            session.commit()
+        payload["shipping"]["service_id"] = 2
+    response = client.post("/api/v1/payments/checkout", json=payload, headers=headers)
+    if tamper == "price_in_payload":
+        assert response.status_code == 200, response.text
+        with Session(engine) as session:
+            payment = session.exec(select(Payment)).one()
+            assert payment.amount == Decimal("68.50")
+        assert captured["shipping_amount"] == Decimal("18.60")
+    else:
+        assert response.status_code in (409, 422), response.text
+        assert captured == {}
+
+
+ADMIN_ROUTES = [
+    ("get", "/api/v1/shipping/admin/connection", None),
+    ("post", "/api/v1/shipping/admin/authorize", None),
+    ("get", "/api/v1/shipping/admin/products", None),
+    ("put", f"/api/v1/shipping/admin/products/{uuid4()}/dimensions",
+     {"shipping_width": 1, "shipping_height": 1, "shipping_length": 1, "shipping_weight": 1}),
+    ("get", "/api/v1/shipping/admin/shipments", None),
+    ("post", f"/api/v1/shipping/admin/shipments/{uuid4()}/prepare", {"invoice_key": "1" * 44}),
+    ("post", f"/api/v1/shipping/admin/shipments/{uuid4()}/reconcile", {"label_ids": [str(uuid4())]}),
+    ("post", f"/api/v1/shipping/admin/shipments/{uuid4()}/pay", None),
+    ("post", f"/api/v1/shipping/admin/shipments/{uuid4()}/generate", None),
+    ("post", f"/api/v1/shipping/admin/shipments/{uuid4()}/print", None),
+    ("post", f"/api/v1/shipping/admin/shipments/{uuid4()}/sync", None),
+]
+
+
+@pytest.mark.parametrize("method,path,body", ADMIN_ROUTES)
+def test_admin_shipping_routes_require_admin(monkeypatch, method, path, body):
+    monkeypatch.setattr(
+        me, "request", lambda *a, **k: pytest.fail("provider should not be called")
+    )
+    kwargs = {"json": body} if body is not None else {}
+    anonymous = getattr(client, method)(path, **kwargs)
+    assert anonymous.status_code == 401
+    customer = {"Authorization": f"Bearer {create_logged_user()}"}
+    assert getattr(client, method)(path, headers=customer, **kwargs).status_code == 403
+
+
+def test_service_catalog_parses_flags_caches_and_tolerates_failure(monkeypatch):
+    monkeypatch.undo()  # drop the autouse catalog stub for this test only
+    monkeypatch.setattr(settings, "MELHOR_ENVIO_ENVIRONMENT", "sandbox")
+    me._catalog.update(environment=None, expires=0.0, data={})
+    calls = []
+
+    def request(session, method, path, **kwargs):
+        calls.append(path)
+        return [
+            {"id": 1, "company": {"has_grouped_volumes": 0}},
+            {"id": 3, "company": {"has_grouped_volumes": 1}},
+            {"id": "broken"},
+        ]
+
+    monkeypatch.setattr(me, "request", request)
+    assert me.service_catalog(None) == {1: False, 3: True}
+    assert me.service_catalog(None) == {1: False, 3: True}
+    assert calls == ["/api/v2/me/shipment/services"]
+
+    me._catalog.update(environment=None, expires=0.0, data={})
+
+    def failing(*args, **kwargs):
+        raise HTTPException(502, "down")
+
+    monkeypatch.setattr(me, "request", failing)
+    assert me.service_catalog(None) == {}
+
+
+@pytest.mark.parametrize(
+    "service,company,expected",
+    [
+        ({"grouped_volumes": False}, "Jadlog", True),
+        ({"grouped_volumes": True}, "Correios", False),
+        ({}, "JeT", True),
+        ({}, "Total Express", True),
+        ({}, "Correios", True),
+        ({}, "Jadlog", False),
+    ],
+)
+def test_one_label_per_package_uses_catalog_then_legacy_names(service, company, expected):
+    assert me.one_label_per_package(service, company) is expected
+
+
+def test_single_volume_carrier_from_catalog_splits_labels(monkeypatch):
+    """J&T is returned as "JeT" by the API; the catalog flag drives splitting."""
+    order_id, admin = make_shipment(monkeypatch)
+    with Session(engine) as session:
+        shipment = session.exec(select(Shipment)).one()
+        quote = session.get(ShippingQuote, shipment.quote_id)
+        items = copy.deepcopy(quote.items)
+        items[0]["quantity"] = 2
+        services = copy.deepcopy(quote.services)
+        service = next(item for item in services if item["id"] == shipment.service_id)
+        service["company"] = "JeT"
+        service["grouped_volumes"] = False
+        service["packages"] = [copy.deepcopy(service["packages"][0]) for _ in range(2)]
+        for package in service["packages"]:
+            package["products"] = [{"id": items[0]["id"], "quantity": 1}]
+        quote.items, quote.services = items, services
+        shipment.company_name = "JeT"
+        session.add(quote)
+        session.add(shipment)
+        session.commit()
+    calls = []
+
+    def request(session, method, path, **kwargs):
+        calls.append(kwargs["body"])
+        return {"id": str(uuid4()), "status": "pending", "price": "10.00"}
+
+    monkeypatch.setattr(me, "request", request)
+    response = client.post(
+        f"/api/v1/shipping/admin/shipments/{order_id}/prepare",
+        headers=admin,
+        json={"invoice_key": "1" * 44},
+    )
+    assert response.status_code == 200, response.text
+    assert len(calls) == 2 and all(len(call["volumes"]) == 1 for call in calls)
