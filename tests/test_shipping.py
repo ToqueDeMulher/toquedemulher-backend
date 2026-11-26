@@ -6,27 +6,29 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID, uuid4
+
 import httpx
 import pytest
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from tests.test_auth import (
-    client,
-    engine,
-    clean_db,
-    create_logged_user,
-    create_admin_token,
-)
 from app.core.settings import settings
 from app.core.time import utc_now
 from app.models.address import Address
 from app.models.payment import Payment
 from app.models.paymentItem import PaymentItem
 from app.models.product import Product
-from app.models.shipping import ShippingConnection, ShippingQuote, Shipment
+from app.models.shipping import Shipment, ShippingConnection, ShippingQuote
 from app.models.stock import Stock
-from app.services import melhor_envio as me, brasil_api, shipment_service as operations
+from app.services import brasil_api
+from app.services import melhor_envio as me
+from tests.test_auth import (
+    clean_db,  # noqa: F401 - imported autouse fixture resets the shared database
+    client,
+    create_admin_token,
+    create_logged_user,
+    engine,
+)
 
 OFFICIAL = json.loads(
     (Path(__file__).parent / "fixtures/melhor_envio_calculate.json").read_text()
@@ -289,7 +291,7 @@ def test_checkout_includes_freight_and_snapshots_recipient(monkeypatch):
 def make_shipment(monkeypatch):
     product_id = setup_product()
     quote = make_quote(monkeypatch, product_id)
-    payload, headers, captured = checkout(monkeypatch, product_id, quote)
+    payload, headers, _captured = checkout(monkeypatch, product_id, quote)
     result = client.post(
         "/api/v1/payments/checkout", json=payload, headers=headers
     ).json()
@@ -392,7 +394,7 @@ def test_oauth_cookie_state_one_time_and_encrypted_tokens(monkeypatch):
     admin = {"Authorization": f"Bearer {create_admin_token()}"}
     response = client.post("/api/v1/shipping/admin/authorize", headers=admin)
     assert response.status_code == 200
-    from urllib.parse import urlparse, parse_qs
+    from urllib.parse import parse_qs, urlparse
 
     state = parse_qs(urlparse(response.json()["url"]).query)["state"][0]
     assert (
@@ -811,7 +813,7 @@ def test_multiple_products_are_merged_and_priced_from_database(monkeypatch):
         session.add(second)
         session.commit()
         second_id = str(second.id)
-    data, calls = fake_calculate(monkeypatch, first)
+    _data, calls = fake_calculate(monkeypatch, first)
     response = quote_request([(first, 1), (second_id, 2), (first, 2)])
     assert response.status_code == 200, response.text
     body = calls[0][2]["body"]
