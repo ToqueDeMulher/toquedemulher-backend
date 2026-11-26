@@ -1,6 +1,7 @@
 # Importa todos os modelos SQLModel (Stack A) para que o SQLModel.metadata
 # os conheca ao criar tabelas.
 from app.models.address import Address
+from app.models.announcement import AnnouncementMessage, AnnouncementRevision
 from app.models.brand import Brand
 from app.models.cart import Cart
 from app.models.cartItem import CartItem
@@ -28,6 +29,8 @@ __all__ = [
     "UserInDB",
     "UserPaymentMethod",
     "Address",
+    "AnnouncementMessage",
+    "AnnouncementRevision",
     "Brand",
     "Category",
     "CategoryProductLink",
